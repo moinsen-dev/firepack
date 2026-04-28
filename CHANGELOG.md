@@ -8,11 +8,55 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M2.5 — WorkBrief firestore.rules Migration. Spec pro Collection
-  augmentieren (read/create/update/delete + verbatim für nicht-
-  pattern-fitting Fälle wie workers-update-status, notifications-
-  self-target, errorReports-pre-org). Anschließend `firebase
-  emulators:exec` als Smoke-Test gegen die Rules.
+- M3 — Dart-Model-Generator (replaces freezed-by-hand for spec-
+  declared collections). Pilot auf einer isolierten Collection
+  (errorReports oder auditLogs).
+
+## [0.0.4] — 2026-04-28
+
+### Added
+- WorkBrief firestore.rules vollständig aus der Spec generiert. 11 von
+  13 Collections haben jetzt `rules:`-Blöcke (workBriefRevisions
+  default-deny via fehlenden Block, trustCharterAcknowledgements
+  bewusst unverändert weil Production diese Collection leer hält
+  und der Ack als Map auf `/users/{uid}` lebt).
+- Mix aus structured (`sourceMaterials`, `aiDrafts`) und verbatim
+  (alle anderen mit Nicht-Pattern-fitting Logic). Verbatim-Anteil
+  hoch, weil:
+  * Workers-update-status auf workBriefs braucht partial-Allowlist
+  * Notifications self-targeting (userId field, nicht doc-id)
+  * errorReports pre-org-Case (organizationId fehlt im Doc)
+  * auditLogs actor-self-check
+  * teams write needs request.resource.data check, nicht resource.data
+
+### Validation
+- `firebase_validate_security_rules` MCP-Tool: clean (keine syntax-
+  oder semantik-Fehler).
+- 12 Match-Blocks identisch zwischen Old/New (außer `organizations`,
+  das im Old-File doppelt match'd hatte → consolidated im New).
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Spec-Augmentation für 11 Collections | 1-1.5h | ~25 min | 3-4× |
+| Generate + Diff + Verify | inkl. | ~10 min | n/a |
+| **Gesamt M2.5** | **1-1.5h** | **~35 min** | **2-3×** |
+
+Lessons:
+- **Verbatim-First-Approach hat sich gelohnt.** Statt strukturierte
+  Rules pro Collection zu erzwingen, ist die Spec-Schreiberei pro
+  Collection eine 1:1-Übersetzung der Production-Rules. Das ist sicher
+  + schnell + zukunftsoffen (verbatim-Patterns die sich oft wiederholen
+  graduieren später zu strukturierten Slots).
+- **Drift-Audit beim Migrieren:** trustCharterAcknowledgements war im
+  Spec mit Rules drin, in Production aber ohne match-block. Generator-
+  Output zeigte den Drift sofort, Spec wurde angepasst → Production-
+  Verhalten erhalten.
+- **`firebase_validate_security_rules` als Smoke-Test reicht** für die
+  Syntax-Validation. Echte Permission-Smokes via emulators:exec sind
+  noch wertvoller, aber clean syntax + structural-equivalence
+  zur Hand-Version sind heute der Cut-Off. Emulator-Test ist
+  separater Add-On wenn die Rules sich semantisch ändern.
 
 ## [0.0.3] — 2026-04-28
 

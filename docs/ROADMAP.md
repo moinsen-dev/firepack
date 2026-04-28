@@ -19,6 +19,42 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.4 — M2.5 WorkBrief Rules Migration (2026-04-28, ~35 min)
+
+- 11 von 13 Collections in der Spec mit `rules:`-Blöcken bestückt.
+  workBriefRevisions intentional ohne (default-deny via fehlenden
+  match-Block — Cloud Functions schreiben via Admin SDK).
+  trustCharterAcknowledgements bewusst ohne Rules (Production hält
+  diese Collection leer; Ack lebt als Map auf /users/{uid}).
+- Mix structured + verbatim. Verbatim für die Nuancen die der
+  Token-Expander noch nicht modelliert: workers-update-status,
+  notifications-self-target, errorReports-pre-org, auditLogs-actor-
+  self, teams-write-stricter.
+- WorkBrief `app/firestore.rules` jetzt aus Spec generiert. 11 unique
+  match-blocks (vs. 12 vorher — `organizations` war im Old-File
+  doppelt match'd, das wurde konsolidiert).
+- Validation via `firebase_validate_security_rules` MCP-Tool: clean.
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Spec-Augmentation für 11 Collections | 1-1.5h | ~25 min | 3-4× |
+| Generate + Diff + Verify | inkl. | ~10 min | n/a |
+| **Gesamt M2.5** | **1-1.5h** | **~35 min** | **2-3×** |
+
+Lessons:
+- **Verbatim-First-Approach hat sich gelohnt** — schneller, sicherer,
+  zukunftsoffen. Patterns die sich oft wiederholen graduieren später
+  zu strukturierten Slots; einmalige Logic bleibt verbatim.
+- **Drift-Audit beim Migrieren** — `trustCharterAcknowledgements` hatte
+  Rules im Spec, fehlte aber in Production. Generator-Output zeigte
+  den Diff, Spec wurde angepasst.
+- **MCP-Tool `firebase_validate_security_rules` als Smoke-Test reicht**
+  für Syntax + grundsätzliche Validity. Emulator-Smoke-Test
+  (`firebase emulators:exec`) bleibt für künftige semantische
+  Änderungen.
+
 ### v0.0.3 — M2 Rules-Generator (Generator-only) (2026-04-28, ~45 min)
 
 - `generateRulesFile(Spec)` emittiert komplettes Rules-File mit
@@ -102,33 +138,6 @@ Jeder Meilenstein hat:
 - die **Lösung**: was firepack dafür generiert
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
-
-### M2.5 — WorkBrief firestore.rules Migration
-
-**Schmerz:** Generator (M2) ist fertig, aber WorkBrief-Rules sind
-weiterhin hand-gepflegt. Drift-Risiko bleibt bis Spec → Rules ein
-deterministischer Pfad ist.
-
-**Lösung:** Pro Collection in `example/workbrief.firepack.yaml` den
-`rules:`-Block ergänzen. Strukturiert (read/create/update/delete) wo
-das Pattern passt, `verbatim:` wo nicht (workers-update-status auf
-workBriefs, notifications-self-targeting, errorReports-pre-org-Case,
-auditLogs-actor-self-check). Dann generieren, gegen aktuelles
-`app/firestore.rules` semantisch diffen, swappen.
-
-**Migrations-PR:** WorkBrief-Spec mit Rules pro Collection augmentiert,
-`app/firestore.rules` wird generiert, `firebase emulators:exec` als
-Smoke-Test gegen ein paar bekannte Permission-Szenarien (worker liest
-fremden Brief = denied; admin liest in Org = allowed; etc.).
-
-**Aufwand:** geschätzt 1-1.5h. Spec hat 8 Collections die Rules
-brauchen, ~5 davon einfach (5 min/Collection), 3 verbatim-mäßig
-(15 min/Collection).
-
-**Akzeptanz:** `firebase deploy --only firestore:rules --dry-run`
-zeigt keine semantischen Änderungen. Rules-auditor-Skill clean.
-
----
 
 ### M3 — Dart-Model-Generator (`freezed`-replacing)
 

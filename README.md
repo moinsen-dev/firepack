@@ -99,7 +99,7 @@ diff in `firepack.yaml`.
 
 **WorkBrief consumption today:**
 - ✅ `firestore.indexes.json` — generated from spec since v0.0.2
-- ☐ `firestore.rules` — generator built, migration pending (M2.5)
+- ✅ `firestore.rules` — generated from spec since v0.0.4 (11/13 collections)
 
 ## Eat-your-own-dogfood reference
 
