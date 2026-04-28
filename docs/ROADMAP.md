@@ -19,6 +19,44 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.6 — M4 Repository-Generator + ErrorReportRepository-Pilot (2026-04-28, ~45 min)
+
+- `generateRepositoryFile(CollectionSpec)` emittiert pro Collection:
+  Repository-Klasse mit typed Query-Methoden, add/updateById/deleteById,
+  plus Riverpod-Provider (Singleton + Family per Query).
+- Query-Spec-Sprache: `where: [tenant, "field == $param", "field
+  contains: $param"]`, `byId`, `orderBy`, `limit`. Multi-Param-Queries
+  via Dart-Records.
+- 24/24 Tests grün, dart analyze clean.
+
+**WorkBrief-Konsumption (Pilot v2):**
+- `app/lib/firepack/repositories/error_report_repository.dart` aus Spec
+  generiert.
+- `error_dashboard_screen` jetzt ConsumerStatefulWidget mit
+  `errorReportWatchByOrg{,AndLevel}Provider`. Inline-Firestore-Query
+  und StreamBuilder weg. Tile arbeitet mit typed ErrorReport.
+- Spec bekam `queries:`-Block für errorReports — Dashboard-API
+  formalisiert.
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Generator + CLI + Tests | 3h | ~30 min | ~6× |
+| Pilot WorkBrief | inkl. | ~10 min | n/a |
+| Doku + Reflexion | inkl. | ~5 min | n/a |
+| **Gesamt M4** | **3h** | **~45 min** | **~4×** |
+
+Lessons:
+- **Repository-Pattern ist der "verbose-aber-mechanisch"-Schmerz pur.**
+  Hand-Repos sind 80-150 LOC mit 70% Boilerplate. Generated: 40 LOC
+  ohne Boilerplate-Kosten. Skaliert für weitere Collections trivial.
+- **Multi-Param-Queries via Records** lösen StreamProvider.family
+  ohne Custom-Class pro Query.
+- **WorkBrief-Diff:** Dashboard ging von 90 LOC inline-Stream + Tile-
+  mit-doc-Cast → 15 LOC ref.watch + AsyncValue.when + Tile-mit-typed-
+  Report. Faktor ~6× weniger Code, signifikant lesbarer.
+
 ### v0.0.5 — M3 Dart-Model-Generator + ErrorReport-Pilot (2026-04-28, ~45 min)
 
 - `generateDartModel(CollectionSpec)` produziert immutable Dart-Klasse:
@@ -175,47 +213,6 @@ Jeder Meilenstein hat:
 - die **Lösung**: was firepack dafür generiert
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
-
-### M4 — Repository-Generator
-
-**Schmerz:** Repo-Pattern ist sauber, aber 13× das gleiche Boilerplate:
-constructor mit `_firestore`, `watchByOrg(orgId)`, `watchById(id)`,
-`add(model)`, `update(model)`, alles mit den Path-Konstanten + tenant-
-Helper aus `core/data/`. ~80-150 Zeilen pro Repo, davon ~70% mechanisch.
-
-**Lösung:** `firepack regen --target repos` liest die `queries:`-Blöcke
-und schreibt typisierte Repos:
-
-```dart
-// generated for `queries: { watchByOrg, watchById, watchByAssignee }`
-class WorkBriefRepository {
-  final FirebaseFirestore _firestore;
-  WorkBriefRepository(this._firestore);
-
-  Stream<List<WorkBrief>> watchByOrg(String orgId) =>
-      _firestore.collection(FirestorePaths.workBriefs)
-                .scopedToOrg(orgId)
-                .orderBy('createdAt', descending: true)
-                .snapshots()
-                .map((snap) => snap.docs.map((d) => WorkBrief.fromJson(d.data())).toList());
-
-  Stream<WorkBrief?> watchById(String id) => …;
-
-  Stream<List<WorkBrief>> watchByAssignee(String orgId, String uid) => …;
-}
-```
-
-Plus die Riverpod-Provider als zweiter Output (Family für argumentierte
-Streams).
-
-**Migrations-PR:** Erste Collection (vermutlich `errorReports` wie in M3).
-Hand-Repo wird gelöscht, Generated steht; UI/Service zeigt auf
-Generated-Provider.
-
-**Aufwand:** ~3h. Templates sind die meiste Arbeit — die Logik ist
-mechanisch.
-
----
 
 ### M5 — `firepack diff`
 

@@ -101,7 +101,7 @@ class _CliError implements Exception {
 }
 
 class _RegenCommand extends _SpecCommand {
-  static const _supportedTargets = {'indexes', 'rules', 'models'};
+  static const _supportedTargets = {'indexes', 'rules', 'models', 'repos'};
 
   _RegenCommand() {
     argParser
@@ -149,25 +149,29 @@ class _RegenCommand extends _SpecCommand {
 
     final spec = readSpec();
 
-    // Multi-file target: models.
-    if (target == 'models') {
-      final outDir = (argResults!['out'] as String?) ?? 'lib/firepack/models';
+    // Multi-file targets: models, repos.
+    if (target == 'models' || target == 'repos') {
+      final defaultOutDir = target == 'models'
+          ? 'lib/firepack/models'
+          : 'lib/firepack/repositories';
+      final outDir = (argResults!['out'] as String?) ?? defaultOutDir;
       final filter = argResults!['collection'] as String?;
       final dir = Directory(outDir);
       if (!dir.existsSync()) dir.createSync(recursive: true);
 
-      final files = generateAllDartModels(
-        spec,
-        sourceFile: argResults!['spec'] as String?,
-      );
+      final specPath = argResults!['spec'] as String?;
+      final files = target == 'models'
+          ? generateAllDartModels(spec, sourceFile: specPath)
+          : generateAllRepositories(spec, sourceFile: specPath);
       var written = 0;
       files.forEach((fileName, content) {
         if (filter != null && filter.isNotEmpty) {
-          // skip collections that don't match the filter (matches the
-          // collection-name root, not the file-name)
-          final inferredCollection = fileName.replaceAll('.dart', '');
-          // crude — filter matches if it starts with inferredCollection-stem
-          if (!filter.toLowerCase().startsWith(inferredCollection.replaceAll('_', ''))) {
+          final inferredCollection = fileName
+              .replaceAll('_repository.dart', '')
+              .replaceAll('.dart', '');
+          if (!filter
+              .toLowerCase()
+              .startsWith(inferredCollection.replaceAll('_', ''))) {
             return;
           }
         }
@@ -175,7 +179,8 @@ class _RegenCommand extends _SpecCommand {
         File(fullPath).writeAsStringSync(content);
         written++;
       });
-      stdout.writeln('firepack regen models: wrote $written file(s) into $outDir/');
+      stdout.writeln('firepack regen $target: '
+          'wrote $written file(s) into $outDir/');
       return 0;
     }
 

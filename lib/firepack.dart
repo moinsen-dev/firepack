@@ -12,3 +12,4 @@ export 'src/viz/mermaid.dart';
 export 'src/codegen/indexes_generator.dart';
 export 'src/codegen/rules_generator.dart';
 export 'src/codegen/dart_model_generator.dart';
+export 'src/codegen/repository_generator.dart';

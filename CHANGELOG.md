@@ -8,9 +8,85 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M4 — Repository-Generator. Aus den `queries:`-Blöcken pro Collection
-  typed `watchByOrg`, `watchById`, `add`, `update` Methoden + Riverpod-
-  Provider-Family.
+- M5 — `firepack diff`. PR-Comment mit semantischem Schema-Diff
+  zwischen Base und PR-Branch (z.B. "+ workBriefs.priority added,
+  ~ users update allowlist now includes canBeAssigned").
+
+## [0.0.6] — 2026-04-28
+
+### Added
+- `lib/src/codegen/repository_generator.dart`:
+  - `generateRepositoryFile(CollectionSpec)` emittiert pro Collection
+    eine `<Cls>Repository`-Klasse plus Riverpod-Provider.
+  - Repository hat: typed `<queryName>(...)`-Methoden für jede in der
+    Spec deklarierte query (Stream<List<T>> oder Stream<T?> für byId),
+    plus `add(doc)`, `updateById(id, fields)`, `deleteById(id)`,
+    plus `_fromDoc`-Helper für `{...d.data(), 'id': d.id}`-Merge.
+  - Provider: `<cls>RepositoryProvider` (singleton) + ein
+    `<cls><Query>Provider` (StreamProvider.family) pro query.
+    Multi-Param-Queries nutzen Dart-Records `({String orgId, String level})`.
+  - `generateAllRepositories(Spec)` — überspringt Collections ohne
+    `queries:`-Block.
+- Query-Spec-Syntax die der Generator versteht:
+  ```yaml
+  queries:
+    watchByOrg:
+      where: [tenant]                        # → .scopedToOrg(orgId)
+      orderBy: createdAt:desc
+      limit: 50
+    watchByOrgAndLevel:
+      where: [tenant, "level == $level"]    # → .where('level', isEqualTo: level)
+      orderBy: createdAt:desc
+    watchByAssignee:
+      where: [tenant, "assignedUserIds contains: $uid"]   # arrayContains
+    watchById:
+      byId: true                             # → Stream<T?> watchById(String id)
+  ```
+- `firepack regen --target repos` CLI mit `--collection`-Filter.
+- 5 neue Tests, 24/24 grün.
+
+### WorkBrief-Konsumption (Pilot — errorReports v2)
+- `app/lib/firepack/repositories/error_report_repository.dart` aus Spec
+  generiert (~40 LOC, sonst hand-geschrieben ~80 LOC).
+- `error_dashboard_screen` ist jetzt ConsumerStatefulWidget und
+  verwendet `errorReportWatchByOrgProvider` und
+  `errorReportWatchByOrgAndLevelProvider` direkt. Vorher: inline
+  `_stream()`-Methode mit hand-Firestore-Query + StreamBuilder. Jetzt:
+  AsyncValue.when, Tile bekommt typed `ErrorReport`. Imports
+  `cloud_firestore`, `firestore_paths`, `tenant_query` weg
+  (die Repo-File trägt sie für den Screen).
+- Spec-Erweiterung: errorReports bekam einen `queries:`-Block (zwei
+  Queries: watchByOrg + watchByOrgAndLevel). Das ist die Definition
+  der Dashboard-API jetzt formalisiert in der Spec.
+
+### Out of scope (M4)
+- Joins / `whereIn` / `whereNotIn` — kein WorkBrief-Bedarf heute.
+- Cursor-basierte Pagination — defer bis Volumen real wird.
+- Server-side Aggregations (count, sum) — Firebase SDK hat das,
+  wir lifteten es ein wenn WorkBrief fragt.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Generator + CLI + Tests | 3h | ~30 min | ~6× |
+| Pilot WorkBrief (ErrorReportRepository) | inkl. | ~10 min | n/a |
+| Doku + Reflexion | inkl. | ~5 min | n/a |
+| **Gesamt M4** | **3h** | **~45 min** | **~4×** |
+
+Lessons:
+- **Repository-Pattern war einer der "verbose-aber-mechanisch"-Pains.**
+  Hand-geschriebene Repos in WorkBrief sind 80-150 LOC, davon ~70%
+  Boilerplate. Generated repo: 40 LOC, 0 boilerplate-Cost. Skaliert
+  besonders günstig auf weitere Collections.
+- **Multi-Param-Queries via Dart-Records** lösen das StreamProvider-
+  Family-Problem elegant — kein Custom-Class pro Query nötig.
+- **Provider-Naming war die einzige nicht-mechanische Entscheidung.**
+  Format `<cls><Query>Provider` (z.B. `errorReportWatchByOrgProvider`)
+  liest sich gut + ist deterministisch ableitbar aus Spec.
+- **WorkBrief-Diff vor M4: 90 LOC inline _stream() + StreamBuilder.**
+  Nach M4: 15 LOC `ref.watch(provider)` + `AsyncValue.when`. Wenn das
+  pattern auf 12 weitere Collections skaliert, ist firepack
+  schon allein durch Repository-Generation gerechtfertigt.
 
 ## [0.0.5] — 2026-04-28
 

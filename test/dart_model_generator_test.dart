@@ -39,7 +39,7 @@ collections:
 ''');
       final out = generateDartModel(spec.collections['things']!);
       expect(out, contains('final String? note;'));
-      expect(out, contains("if (this.note != null) 'note': this.note"));
+      expect(out, contains("if (note != null) 'note': note"));
       expect(out, contains('note: json[\'note\'] as String?'));
     });
 
@@ -60,7 +60,7 @@ collections:
       expect(out, contains('enum ThingLevel { low, medium, high }'));
       expect(out, contains('final ThingLevel level;'));
       expect(out, contains('this.level = ThingLevel.medium'));
-      expect(out, contains("'level': this.level.name"));
+      expect(out, contains("'level': level.name"));
       expect(out, contains('ThingLevel.values.byName(json[\'level\'] as String)'));
     });
 

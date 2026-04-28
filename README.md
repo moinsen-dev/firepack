@@ -86,22 +86,24 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.5):**
+**Today (v0.0.6):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
 - ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
 - ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
-- ☐ Repository + provider codegen
+- ✅ Repository + Riverpod provider codegen (typed queries from spec)
 - ☐ TypeScript-types generator
+- ☐ `firepack diff` (PR-comment-shape semantic diff)
 - ☐ Watch mode
 - ☐ Pub.dev release
 
 **WorkBrief consumption today:**
-- ✅ `firestore.indexes.json` — generated from spec since v0.0.2
-- ✅ `firestore.rules` — generated from spec since v0.0.4
-- ✅ `lib/firepack/models/error_report.dart` — first generated Dart
-  model since v0.0.5 (pilot, used by error_dashboard)
+- ✅ `firestore.indexes.json` — generated since v0.0.2
+- ✅ `firestore.rules` — generated since v0.0.4
+- ✅ `lib/firepack/models/error_report.dart` — generated since v0.0.5
+- ✅ `lib/firepack/repositories/error_report_repository.dart` —
+  generated since v0.0.6, drives the /admin/errors dashboard
 
 ## Eat-your-own-dogfood reference
 
