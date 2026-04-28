@@ -9,3 +9,4 @@ export 'src/spec/spec.dart';
 export 'src/spec/parser.dart';
 export 'src/spec/lint.dart';
 export 'src/viz/mermaid.dart';
+export 'src/codegen/indexes_generator.dart';

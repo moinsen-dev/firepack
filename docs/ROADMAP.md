@@ -19,6 +19,43 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.2 — M1 Indexes-Generator (2026-04-28, ~18 min)
+
+- `generateIndexesJson(Spec)` deterministisch → 11 Indexes für WorkBrief
+- `firepack regen --target indexes [--out path]` CLI
+- Test-Fixture-Compare gegen den realen WorkBrief-File (semantische
+  collection-group + fields tuple-set Identität)
+- Test-Suite jetzt 7/7 grün
+- WorkBrief-Spec-Drift entdeckt + behoben: `issues`-Collection bekam
+  den zweiten Index der schon in Production lag, aber in der Spec
+  fehlte. Erster echter Eat-Your-Own-Dogfood-Wert.
+
+**WorkBrief-Konsumption:** `app/firestore.indexes.json` wird jetzt
+aus der Spec generiert. Diff zur Hand-Version war ausschließlich
+Reihenfolge, null semantischer Drift. Erster echter Bootstrap-Loop.
+
+#### Reflexion (Schätzung vs. Realität)
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| A — Generator + CLI + Test | 30 min | ~10 min | ~3× |
+| B — WorkBrief-Migration | 10 min | ~3 min | ~3× |
+| C — Doku + Reflexion | 10 min | ~5 min | ~2× |
+| **Gesamt** | **50 min** | **~18 min** | **~3×** |
+
+Lessons:
+- **Spec-First-Modell zahlt sich sofort aus:** Der Drift im
+  `issues`-Index wurde beim allerersten Generator-Lauf gefunden — kein
+  Zufall, das ist genau der Wert.
+- **Custom-JSON-Formatter (statt `JsonEncoder.withIndent`) hat sich
+  gelohnt** — Fields auf einer Zeile machen Diffs lesbar; mit Standard-
+  Encoder wäre der initiale WorkBrief-Diff 4× größer geworden.
+- **Test gegen Reference-Fixture mit semantischem Tuple-Set-Compare**
+  schlägt Byte-Diff. Reordering ist OK, Inhalts-Drift nicht.
+- **Schätzung war ~3× zu hoch** — gleicher Faktor wie das Foundation-
+  Commit. Pattern: das Spec-Modell + Parser-Foundation tragen jetzt
+  die folgenden Generatoren extrem günstig.
+
 ---
 
 ## Geplant — WorkBrief-driven
@@ -28,38 +65,6 @@ Jeder Meilenstein hat:
 - die **Lösung**: was firepack dafür generiert
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
-
-### M1 — Indexes-Generator
-
-**Schmerz:** Beim Hinzufügen einer neuen Query merkt man erst beim ersten
-Run "missing index" und kopiert den Console-Link nach `firestore.indexes.json`.
-Manchmal vergisst man's, der Build geht durch, Production fail-at-runtime.
-
-**Lösung:** `firepack regen --target indexes` schreibt `firestore.indexes.json`
-deterministisch aus den `indexes:`-Blöcken der Spec.
-
-**Migrations-PR (WorkBrief):** Bestehende `firestore.indexes.json` wird
-durch generiertes Output ersetzt. Spec-Definition wird zur Single Source
-of Truth. Erste WorkBrief-PR die firepack tatsächlich konsumiert.
-
-**Output:**
-```json
-{
-  "indexes": [
-    {"collectionGroup": "workBriefs",
-     "queryScope": "COLLECTION",
-     "fields": [
-       {"fieldPath": "organizationId", "order": "ASCENDING"},
-       {"fieldPath": "createdAt",      "order": "DESCENDING"}
-     ]}
-  ]
-}
-```
-
-**Aufwand:** ~1h. Trivialer Generator, deterministischer Output, klarer
-Validierungs-Test (gegen `app/firestore.indexes.json` diffen).
-
----
 
 ### M2 — Rules-Generator
 

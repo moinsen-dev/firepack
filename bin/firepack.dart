@@ -9,8 +9,8 @@ Future<void> main(List<String> args) async {
     'Spec-driven Firestore + Flutter codegen.',
   )
     ..addCommand(_LintCommand())
-    ..addCommand(_VizCommand());
-  // ..addCommand(_RegenCommand());   // T0DO once codegens land
+    ..addCommand(_VizCommand())
+    ..addCommand(_RegenCommand());
 
   final exitCode = await runner.run(args) ?? 0;
   exit(exitCode);
@@ -98,4 +98,66 @@ class _VizCommand extends _SpecCommand {
 class _CliError implements Exception {
   final int exitCode;
   _CliError(this.exitCode);
+}
+
+class _RegenCommand extends _SpecCommand {
+  static const _supportedTargets = {'indexes'};
+
+  _RegenCommand() {
+    argParser
+      ..addOption(
+        'target',
+        abbr: 't',
+        help: 'What to regenerate. Today: indexes. '
+            'Future: rules, models, repos, types.',
+        allowed: ['indexes', 'rules', 'models', 'repos', 'types'],
+        defaultsTo: 'indexes',
+      )
+      ..addOption(
+        'out',
+        abbr: 'o',
+        help: 'Output file. "-" for stdout.',
+      );
+  }
+
+  @override
+  String get name => 'regen';
+
+  @override
+  String get description =>
+      'Regenerates an artifact from the spec '
+      '(indexes today, more targets coming via firepack ROADMAP).';
+
+  @override
+  Future<int> run() async {
+    final target = argResults!['target'] as String;
+    if (!_supportedTargets.contains(target)) {
+      stderr.writeln(
+        'firepack regen: target "$target" not yet implemented '
+        '— see docs/ROADMAP.md.',
+      );
+      return 64; // EX_USAGE
+    }
+
+    final spec = readSpec();
+    String content;
+    String defaultOut;
+    switch (target) {
+      case 'indexes':
+        content = generateIndexesJson(spec);
+        defaultOut = 'firestore.indexes.json';
+      default:
+        return 64;
+    }
+
+    final outPath = (argResults!['out'] as String?) ?? defaultOut;
+    if (outPath == '-') {
+      stdout.write(content);
+    } else {
+      File(outPath).writeAsStringSync(content);
+      stdout.writeln('firepack regen: wrote $outPath '
+          '(${content.length} chars)');
+    }
+    return 0;
+  }
 }
