@@ -147,11 +147,19 @@ class RulesSpec {
   final List<RuleClause> update;
   final String? delete;
 
+  /// Escape-hatch for rule fragments the spec language doesn't model
+  /// yet — raw Firestore-rule-DSL text appended inside the match block,
+  /// after the generated `allow` lines. Kept as a string so the spec
+  /// stays untyped where the generator hasn't reached parity with our
+  /// real-world rules. Whitespace + linebreaks preserved.
+  final String? verbatim;
+
   const RulesSpec({
     this.read,
     this.create,
     this.update = const [],
     this.delete,
+    this.verbatim,
   });
 }
 

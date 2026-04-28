@@ -8,7 +8,71 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M2 Rules-Generator als nächste Iteration
+- M2.5 — WorkBrief firestore.rules Migration. Spec pro Collection
+  augmentieren (read/create/update/delete + verbatim für nicht-
+  pattern-fitting Fälle wie workers-update-status, notifications-
+  self-target, errorReports-pre-org). Anschließend `firebase
+  emulators:exec` als Smoke-Test gegen die Rules.
+
+## [0.0.3] — 2026-04-28
+
+### Added
+- `lib/src/codegen/rules_generator.dart` — `generateRulesFile(Spec)`.
+  Emittiert `rules_version='2'`-Header, fixe Helper-Functions (isSignedIn,
+  userDoc, getUserOrgId, getUserRole, isAdmin, isSupervisorOrAdmin),
+  pro Collection einen `match /<col>/{<idVar>} { … }` Block mit
+  `allow read/create/update/delete: if …` Lines, sowie `match
+  /{document=**}` Default-Deny am Ende.
+- Token-Expander für die Spec-Helper:
+  `signedIn` → `isSignedIn()`, `tenantSelf` → tenant-Field-Vergleich
+  (kontextabhängig: `resource.data.x` für Read/Update/Delete vs.
+  `request.resource.data.x` für Create), `tenantMatchOrAdmin`,
+  `isAdmin`, `isSupervisorOrAdmin`/`supervisorOrAdmin`, `self`.
+- Field-Allowlist-Update — `fields: "name,foo,bar"` wird zu
+  `request.resource.data.diff(resource.data).affectedKeys().hasOnly([…])`.
+- `verbatim:`-Block in `RulesSpec` (Spec + Parser + Generator). Escape-
+  hatch für Rule-Fragmente die der Token-Expander noch nicht modelliert
+  (z.B. workers-update-only-status auf workBriefs, notifications-self-
+  targeting, errorReports-pre-org-case). Raw Firestore-Rule-Text wird
+  inside-the-match-block eingerückt angehängt.
+- `firepack regen --target rules [--out path]` CLI-Subcommand.
+- 5 neue Tests, alle 13 Tests grün.
+
+### Honest scope of v0.0.3
+Generator funktioniert für die Patterns die er kennt + Verbatim-Escape
+steht zur Verfügung. **WorkBrief firestore.rules ist bewusst noch
+nicht migriert.** Grund:
+- Heutige WorkBrief-Spec hat `rules:` für 5 von 13 Collections; die
+  anderen 8 (sourceMaterials, aiDrafts, workBriefs, workBriefRevisions,
+  evidence, issues, notifications, errorReports) brauchen Augmentation.
+- Verbatim-Cases (workers-update-status, notifications-self-target,
+  errorReports-pre-org) brauchen Sorgfalt — Rules-Sicherheit ist kein
+  "schnell-rüberschreiben"-Job.
+- Migrations-Smoke via `firebase emulators:exec` ist Pflicht bevor wir
+  Production-Rules anfassen.
+
+→ siehe `docs/ROADMAP.md` M2.5.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| A — Generator + CLI + Tests + Verbatim | 3-4h | ~35 min | 5-7× |
+| B — WorkBrief-Migration | im Plan inklusive | deferred → M2.5 | n/a |
+| C — Doku + Reflexion | inklusive | ~10 min | n/a |
+| **Gesamt M2 (ohne Migration)** | **3-4h** | **~45 min** | **4-5×** |
+
+Lessons:
+- **Schätzung mehrfach reduziert sich um Faktor 4-7×** sobald die Spec-
+  Foundation steht. Gleicher Pattern wie M1 (3×) und Foundation (300×).
+- **Token-Expander vs. AST:** Simple String-Replace reicht für die
+  Spec-Helper. AST kommt erst wenn Operator-Precedence-Probleme oder
+  Verschachtelung wirklich auftauchen.
+- **Verbatim-Escape ist Bootstrap-pragmatisch:** Spec-Sprache muss
+  nicht alles modellieren — was sich oft wiederholt landet später als
+  strukturierter Slot, alles andere bleibt verbatim.
+- **WorkBrief-Migration zu beschleunigen wäre falsche Entscheidung:**
+  Rules-Sicherheit ist nicht das Feld für "schnell rüberziehen" —
+  M2.5 macht das mit Augenmerk.
 
 ## [0.0.2] — 2026-04-28
 

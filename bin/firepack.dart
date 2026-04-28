@@ -101,7 +101,7 @@ class _CliError implements Exception {
 }
 
 class _RegenCommand extends _SpecCommand {
-  static const _supportedTargets = {'indexes'};
+  static const _supportedTargets = {'indexes', 'rules'};
 
   _RegenCommand() {
     argParser
@@ -146,6 +146,9 @@ class _RegenCommand extends _SpecCommand {
       case 'indexes':
         content = generateIndexesJson(spec);
         defaultOut = 'firestore.indexes.json';
+      case 'rules':
+        content = generateRulesFile(spec);
+        defaultOut = 'firestore.rules';
       default:
         return 64;
     }

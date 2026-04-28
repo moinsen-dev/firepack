@@ -86,16 +86,20 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.1):**
+**Today (v0.0.3):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output
+- ✅ Indexes generator (`firestore.indexes.json`, deterministic)
+- ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
 - ☐ Dart model codegen
 - ☐ Repository + provider codegen
-- ☐ Rules generator
-- ☐ Indexes generator
 - ☐ TypeScript-types generator
 - ☐ Watch mode
 - ☐ Pub.dev release
+
+**WorkBrief consumption today:**
+- ✅ `firestore.indexes.json` — generated from spec since v0.0.2
+- ☐ `firestore.rules` — generator built, migration pending (M2.5)
 
 ## Eat-your-own-dogfood reference
 

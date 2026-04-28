@@ -19,6 +19,43 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.3 — M2 Rules-Generator (Generator-only) (2026-04-28, ~45 min)
+
+- `generateRulesFile(Spec)` emittiert komplettes Rules-File mit
+  Helper-Prefix, per-Collection match blocks, default-deny tail
+- Token-Expander: signedIn, tenantSelf, tenantMatchOrAdmin, isAdmin,
+  isSupervisorOrAdmin/supervisorOrAdmin, self
+- Field-Allowlist-Update über `affectedKeys().hasOnly([…])`
+- `verbatim:`-Escape-hatch in Spec/Parser/Generator
+- `firepack regen --target rules` CLI
+- 5 neue Tests, 13/13 grün
+
+**WorkBrief-Konsumption:** **bewusst NOCH NICHT migriert.** Generator
+funktioniert, Spec hat aber nur für 5 von 13 Collections `rules:`-
+Blöcke. Migration verlegt nach M2.5 wegen Sorgfaltspflicht
+(Rules-Sicherheit ≠ schnell rüberziehen).
+
+#### Reflexion (Schätzung vs. Realität)
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| A — Generator + CLI + Tests + Verbatim | 3-4h | ~35 min | 5-7× |
+| B — WorkBrief-Migration | im Plan inklusive | deferred → M2.5 | n/a |
+| C — Doku + Reflexion | inklusive | ~10 min | n/a |
+| **Gesamt M2 (ohne Migration)** | **3-4h** | **~45 min** | **4-5×** |
+
+Lessons:
+- **Faktor schrumpft mit jedem Iteration:** Foundation 300×, M1 3×,
+  M2-Generator 5-7×. Spec-Foundation trägt jeden weiteren Generator.
+- **Token-Expander als String-Replace reicht** für die heutigen
+  Helper. AST kommt erst wenn Verschachtelung wirklich auftaucht.
+- **Verbatim-Escape ist Bootstrap-Genuss:** Spec muss nicht alles
+  modellieren — was sich oft wiederholt wandert später als
+  strukturierter Slot, alles andere bleibt verbatim.
+- **WorkBrief-Migration nicht beschleunigt:** Production-Rules
+  anfassen ohne Smoke-Tests wäre die falsche Art von Geschwindigkeit.
+  M2.5 macht das mit Augenmerk und `firebase emulators:exec`.
+
 ### v0.0.2 — M1 Indexes-Generator (2026-04-28, ~18 min)
 
 - `generateIndexesJson(Spec)` deterministisch → 11 Indexes für WorkBrief
@@ -66,30 +103,30 @@ Jeder Meilenstein hat:
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
 
-### M2 — Rules-Generator
+### M2.5 — WorkBrief firestore.rules Migration
 
-**Schmerz:** `firestore.rules` ist die heikelste Datei im Projekt — ein
-Tippfehler heißt Cross-Tenant-Leak. Heute hand-gepflegt mit Audits via
-`firestore-security-rules-auditor`-Skill nach jeder Änderung. Drift
-zwischen "was die Spec sagt" und "was die Rules durchsetzen" ist real
-(siehe `canBeAssigned`-Allowlist-Update letzte Woche).
+**Schmerz:** Generator (M2) ist fertig, aber WorkBrief-Rules sind
+weiterhin hand-gepflegt. Drift-Risiko bleibt bis Spec → Rules ein
+deterministischer Pfad ist.
 
-**Lösung:** `firepack regen --target rules` schreibt `firestore.rules`
-aus den `rules:`-Blöcken. Helper-Tokens werden expandiert:
-- `tenantSelf` → `request.resource.data.organizationId == getUserOrgId()`
-- `isAdmin` → `getUserRole() == 'admin'`
-- `signedIn` → `request.auth != null`
+**Lösung:** Pro Collection in `example/workbrief.firepack.yaml` den
+`rules:`-Block ergänzen. Strukturiert (read/create/update/delete) wo
+das Pattern passt, `verbatim:` wo nicht (workers-update-status auf
+workBriefs, notifications-self-targeting, errorReports-pre-org-Case,
+auditLogs-actor-self-check). Dann generieren, gegen aktuelles
+`app/firestore.rules` semantisch diffen, swappen.
 
-Self-Update-Allowlist (`role: self, fields: [name, …]`) wird in
-`request.resource.data.diff(resource.data).affectedKeys().hasOnly([…])`-
-Konstrukt umgesetzt.
+**Migrations-PR:** WorkBrief-Spec mit Rules pro Collection augmentiert,
+`app/firestore.rules` wird generiert, `firebase emulators:exec` als
+Smoke-Test gegen ein paar bekannte Permission-Szenarien (worker liest
+fremden Brief = denied; admin liest in Org = allowed; etc.).
 
-**Migrations-PR:** Existing `firestore.rules` wird durch generiertes
-Output ersetzt; manuelle Sonderregeln wandern als `rules:` in die Spec.
+**Aufwand:** geschätzt 1-1.5h. Spec hat 8 Collections die Rules
+brauchen, ~5 davon einfach (5 min/Collection), 3 verbatim-mäßig
+(15 min/Collection).
 
-**Aufwand:** ~3-4h. Helper-Token-Expander muss korrekt sein (Test-Coverage
-ist Pflicht). Output-Diff gegen aktuelles Hand-Rules-File ist Akzeptanz-
-Kriterium.
+**Akzeptanz:** `firebase deploy --only firestore:rules --dry-run`
+zeigt keine semantischen Änderungen. Rules-auditor-Skill clean.
 
 ---
 

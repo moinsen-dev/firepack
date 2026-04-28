@@ -288,6 +288,7 @@ class FirepackParser {
       create: create,
       update: updateClauses,
       delete: delete,
+      verbatim: node['verbatim']?.toString(),
     );
   }
 
