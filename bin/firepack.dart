@@ -101,22 +101,30 @@ class _CliError implements Exception {
 }
 
 class _RegenCommand extends _SpecCommand {
-  static const _supportedTargets = {'indexes', 'rules'};
+  static const _supportedTargets = {'indexes', 'rules', 'models'};
 
   _RegenCommand() {
     argParser
       ..addOption(
         'target',
         abbr: 't',
-        help: 'What to regenerate. Today: indexes. '
-            'Future: rules, models, repos, types.',
+        help: 'What to regenerate. Today: indexes, rules, models. '
+            'Future: repos, types.',
         allowed: ['indexes', 'rules', 'models', 'repos', 'types'],
         defaultsTo: 'indexes',
       )
       ..addOption(
         'out',
         abbr: 'o',
-        help: 'Output file. "-" for stdout.',
+        help: 'Output file (single-file targets) or directory '
+            '(multi-file targets like models). "-" for stdout '
+            '(single-file targets only).',
+      )
+      ..addOption(
+        'collection',
+        abbr: 'c',
+        help: 'For multi-file targets, restrict to one collection '
+            '(e.g. --collection errorReports). Empty = all.',
       );
   }
 
@@ -140,6 +148,38 @@ class _RegenCommand extends _SpecCommand {
     }
 
     final spec = readSpec();
+
+    // Multi-file target: models.
+    if (target == 'models') {
+      final outDir = (argResults!['out'] as String?) ?? 'lib/firepack/models';
+      final filter = argResults!['collection'] as String?;
+      final dir = Directory(outDir);
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+
+      final files = generateAllDartModels(
+        spec,
+        sourceFile: argResults!['spec'] as String?,
+      );
+      var written = 0;
+      files.forEach((fileName, content) {
+        if (filter != null && filter.isNotEmpty) {
+          // skip collections that don't match the filter (matches the
+          // collection-name root, not the file-name)
+          final inferredCollection = fileName.replaceAll('.dart', '');
+          // crude — filter matches if it starts with inferredCollection-stem
+          if (!filter.toLowerCase().startsWith(inferredCollection.replaceAll('_', ''))) {
+            return;
+          }
+        }
+        final fullPath = '$outDir/$fileName';
+        File(fullPath).writeAsStringSync(content);
+        written++;
+      });
+      stdout.writeln('firepack regen models: wrote $written file(s) into $outDir/');
+      return 0;
+    }
+
+    // Single-file targets.
     String content;
     String defaultOut;
     switch (target) {

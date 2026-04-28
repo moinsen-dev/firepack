@@ -19,6 +19,43 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.5 — M3 Dart-Model-Generator + ErrorReport-Pilot (2026-04-28, ~45 min)
+
+- `generateDartModel(CollectionSpec)` produziert immutable Dart-Klasse:
+  final fields, const ctor mit named params (required/default-aware),
+  toJson (DateTime → ISO, enum → .name, omit-if-null), factory
+  fromJson, generated enum classes pro enum-Feld.
+- `generateAllDartModels(Spec)` für Multi-File-Output.
+- `firepack regen --target models` mit `--collection`-Filter für
+  Pilot-Migrationen.
+- 19/19 Tests grün, dart analyze clean.
+
+**WorkBrief-Konsumption (Pilot):**
+- `app/lib/firepack/models/error_report.dart` aus Spec (15 Felder +
+  ErrorReportLevel-Enum).
+- `error_dashboard_screen` parst Reports jetzt typed über
+  `ErrorReport.fromJson` statt Map-Cast-Boilerplate.
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Generator + CLI + Tests | 5h | ~30 min | ~10× |
+| Pilot WorkBrief | inkl. | ~10 min | n/a |
+| Doku + Reflexion | inkl. | ~5 min | n/a |
+| **Gesamt M3** | **5h** | **~45 min** | **~6-7×** |
+
+Lessons:
+- **Generator-Pattern wiederbenutzt:** Spec walken, type-aware
+  String-Templating, Test gegen Mini-Spec — Foundation aus M1+M2
+  trägt jeden weiteren Generator quasi für umsonst.
+- **Analyzer-clean ab Iteration 2:** Erste Iteration emittierte
+  `this.foo` in toJson → unnecessary_this-Lint. Ein-Zeilen-Fix im
+  Generator, regen, sauber.
+- **Pilot statt Big-Bang:** Ein Konsument (Dashboard) reicht als
+  Beweis. M4-M6 graduieren weitere Konsumenten (oder Collections)
+  wenn Bedarf entsteht.
+
 ### v0.0.4 — M2.5 WorkBrief Rules Migration (2026-04-28, ~35 min)
 
 - 11 von 13 Collections in der Spec mit `rules:`-Blöcken bestückt.
@@ -138,34 +175,6 @@ Jeder Meilenstein hat:
 - die **Lösung**: was firepack dafür generiert
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
-
-### M3 — Dart-Model-Generator (`freezed`-replacing)
-
-**Schmerz:** Field-Add berührt 9 Files. Letztens am `canBeAssigned`-
-Beispiel gezählt: AppUser (Domain) + AppUser.freezed (auto) + AppUser.g
-(auto) + role_extensions + 3 Repository-Stellen + Profile-UI-Toggle +
-Router. Auto-gen-Files sind 47 Zeilen Diff für 1 Feld.
-
-**Lösung:** `firepack regen --target models` schreibt für jede Collection:
-- `lib/firepack/models/<collection>.dart` — Freezed-äquivalente Klasse,
-  aber selbst-generiert (nicht via build_runner). Kein `freezed`-Dep.
-- Enum-Klassen für `enum`-Felder
-- Nested-Type-Klassen für `list[Type]`-Felder
-
-JsonSerializable-Compatible (toJson/fromJson generiert mit), so dass
-existing Repos weiter funktionieren.
-
-**Migrations-PR:** WorkBrief startet mit **einer** Collection als Pilot
-(`errorReports` — isoliert, keine UI-Konsumenten). Generated Model
-ersetzt das hand-geschriebene. Wenn das durchgeht, dann der Rest in
-einem zweiten PR.
-
-**Aufwand:** ~5h. Tricky bei nested Freezed-Types (`tasks: list[DraftTask]`).
-Pragma: erste Iteration nur Top-Level-Models, nested wird durch
-inline-Map-Type abgehandelt; nested-Codegen kommt in M3.5 wenn Bedarf
-auftritt.
-
----
 
 ### M4 — Repository-Generator
 

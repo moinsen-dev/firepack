@@ -86,12 +86,12 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.3):**
+**Today (v0.0.5):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
 - ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
-- ☐ Dart model codegen
+- ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
 - ☐ Repository + provider codegen
 - ☐ TypeScript-types generator
 - ☐ Watch mode
@@ -99,7 +99,9 @@ diff in `firepack.yaml`.
 
 **WorkBrief consumption today:**
 - ✅ `firestore.indexes.json` — generated from spec since v0.0.2
-- ✅ `firestore.rules` — generated from spec since v0.0.4 (11/13 collections)
+- ✅ `firestore.rules` — generated from spec since v0.0.4
+- ✅ `lib/firepack/models/error_report.dart` — first generated Dart
+  model since v0.0.5 (pilot, used by error_dashboard)
 
 ## Eat-your-own-dogfood reference
 

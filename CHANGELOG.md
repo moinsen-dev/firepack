@@ -8,9 +8,67 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M3 — Dart-Model-Generator (replaces freezed-by-hand for spec-
-  declared collections). Pilot auf einer isolierten Collection
-  (errorReports oder auditLogs).
+- M4 — Repository-Generator. Aus den `queries:`-Blöcken pro Collection
+  typed `watchByOrg`, `watchById`, `add`, `update` Methoden + Riverpod-
+  Provider-Family.
+
+## [0.0.5] — 2026-04-28
+
+### Added
+- `lib/src/codegen/dart_model_generator.dart`:
+  - `generateDartModel(CollectionSpec)` emittiert eine immutable Dart-
+    Klasse pro Collection: final-Felder, const-Konstruktor mit named
+    params (required/default-aware), `toJson()` (DateTime → ISO,
+    enums → `.name`, omit-if-null für optional fields), `factory
+    fromJson` mit allen Casts.
+  - Generated Enum-Klassen für jedes `enum`-Feld (z.B.
+    `ErrorReportLevel { info, warning, error, critical }`).
+  - `generateAllDartModels(Spec)` returns Map filename → content für
+    Multi-File-Output.
+- `firepack regen --target models` CLI:
+  - `--out <dir>` (default `lib/firepack/models`)
+  - `--collection <name>` zum Filtern auf eine Collection (Pilot-
+    Migration-Support).
+- 6 neue Tests, 19/19 grün.
+
+### WorkBrief-Konsumption (Pilot — errorReports)
+- `app/lib/firepack/models/error_report.dart` aus Spec generiert
+  (15 Felder, 1 generated Enum). flutter analyze clean.
+- `error_dashboard_screen.dart` parst `errorReports`-Docs jetzt
+  über `ErrorReport.fromJson` statt manuell `data['level'] as String?`
+  etc. Type-Safety auf level/type/message/createdAt geht durch
+  `ErrorReportLevel.error|critical`-Enum-Vergleich. ~6 Zeilen
+  hand-Cast-Boilerplate weg.
+
+### Out of scope (M3)
+- `copyWith()` — Konsumenten rebuild via Konstruktor; kommt erst wenn
+  Edit-Flows sich beschweren.
+- `==` / `hashCode` — analog.
+- Nested-Type-Modeling (z.B. `tasks: list[DraftTask]`) — heute
+  `List<dynamic>` Fallback. Spec-Erweiterung wenn häufig.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Generator + CLI + Tests | 5h | ~30 min | ~10× |
+| Pilot WorkBrief (ErrorReport) | inkl. | ~10 min | n/a |
+| Doku + Reflexion | inkl. | ~5 min | n/a |
+| **Gesamt M3** | **5h** | **~45 min** | **~6-7×** |
+
+Lessons:
+- **Generator-Pattern wiederholt sich.** Spec walken, type-aware
+  String-Templating, Test gegen Mini-Spec — wir haben den Pfad
+  aus M1 + M2 wiederbenutzt. Das Spec-Modell trägt jeden weiteren
+  Generator extrem günstig (Foundation-Pattern).
+- **`unnecessary_this`-Lint catched es im flutter analyze.** Erste
+  Iteration emittierte `this.foo` in toJson, war Lint-noisy. Ein-Zeilen-
+  Fix im Generator, regen, analyze clean.
+- **Analyzer ist dein Smoke-Test.** Generated Code muss von Anfang an
+  flutter analyze clean produzieren — sonst springen 13 Lints pro
+  generierter Datei. M3 produzierte das ab Iteration 2 sauber.
+- **Pilot statt Big-Bang ist richtig.** Ein Konsument (Dashboard) ist
+  genug Beweis. Die anderen 12 Collections können später, wenn echter
+  Bedarf.
 
 ## [0.0.4] — 2026-04-28
 
