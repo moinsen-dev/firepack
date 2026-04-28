@@ -10,7 +10,8 @@ Future<void> main(List<String> args) async {
   )
     ..addCommand(_LintCommand())
     ..addCommand(_VizCommand())
-    ..addCommand(_RegenCommand());
+    ..addCommand(_RegenCommand())
+    ..addCommand(_DiffCommand());
 
   final exitCode = await runner.run(args) ?? 0;
   exit(exitCode);
@@ -98,6 +99,68 @@ class _VizCommand extends _SpecCommand {
 class _CliError implements Exception {
   final int exitCode;
   _CliError(this.exitCode);
+}
+
+class _DiffCommand extends Command<int> {
+  _DiffCommand() {
+    argParser
+      ..addOption(
+        'old',
+        help: 'Path to the OLD firepack.yaml (e.g. base branch).',
+        mandatory: true,
+      )
+      ..addOption(
+        'new',
+        help: 'Path to the NEW firepack.yaml (e.g. PR branch).',
+        mandatory: true,
+      )
+      ..addOption(
+        'out',
+        abbr: 'o',
+        help: 'Where to write the Markdown report. "-" or omitted = stdout.',
+      );
+  }
+
+  @override
+  String get name => 'diff';
+
+  @override
+  String get description =>
+      'Renders a Markdown diff between two firepack.yaml files — '
+      'shape suitable for a PR comment.';
+
+  @override
+  Future<int> run() async {
+    final oldPath = argResults!['old'] as String;
+    final newPath = argResults!['new'] as String;
+    final outPath = argResults!['out'] as String?;
+
+    final oldFile = File(oldPath);
+    final newFile = File(newPath);
+    if (!oldFile.existsSync()) {
+      stderr.writeln('firepack diff: --old file not found: $oldPath');
+      return 2;
+    }
+    if (!newFile.existsSync()) {
+      stderr.writeln('firepack diff: --new file not found: $newPath');
+      return 2;
+    }
+
+    final oldSpec =
+        FirepackParser().parse(oldFile.readAsStringSync(), sourceName: oldPath);
+    final newSpec =
+        FirepackParser().parse(newFile.readAsStringSync(), sourceName: newPath);
+    final report = renderMarkdown(diffSpecs(oldSpec, newSpec));
+
+    if (outPath == null || outPath == '-') {
+      stdout.write(report);
+    } else {
+      File(outPath).writeAsStringSync(report);
+      stdout.writeln('firepack diff: wrote $outPath '
+          '(${report.length} chars)');
+    }
+    return 0;
+  }
 }
 
 class _RegenCommand extends _SpecCommand {

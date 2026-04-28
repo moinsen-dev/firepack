@@ -86,15 +86,15 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.6):**
+**Today (v0.0.7):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
 - ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
 - ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
 - ✅ Repository + Riverpod provider codegen (typed queries from spec)
+- ✅ `firepack diff` (PR-comment-shape semantic diff)
 - ☐ TypeScript-types generator
-- ☐ `firepack diff` (PR-comment-shape semantic diff)
 - ☐ Watch mode
 - ☐ Pub.dev release
 

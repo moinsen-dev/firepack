@@ -19,6 +19,33 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 **WorkBrief-Konsumption:** noch keine. v0.0.1 ist read-only — der
 Validator ersetzt manuelles Markdown-Spec-Tracking.
 
+### v0.0.7 — M5 firepack diff (2026-04-28, ~35 min)
+
+- `diffSpecs(oldSpec, newSpec)` walkt Collections, Fields, Indexes,
+  Queries, Rules-Slots; `renderMarkdown(diff)` produziert PR-Comment-
+  taugliche Output.
+- `firepack diff --old <a.yaml> --new <b.yaml> [--out file]` CLI.
+- 5 neue Tests, 29/29 grün.
+- Live-Smoke gegen Git-History rekonstruierte alle 4 vorherigen
+  Iterationen (Rule-Verbatim-Changes, query-add für errorReports,
+  index-add für issues).
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Diff-Modell + Markdown | 1h | ~20 min | 3× |
+| CLI + Tests | 0.5h | ~10 min | 3× |
+| Doku + Live-Smoke | inkl. | ~5 min | n/a |
+| **Gesamt M5** | **1.5h** | **~35 min** | **~3×** |
+
+Lessons:
+- **Verbatim-Diff bewusst flach** — Reviewer pullt das File auf, kein
+  inline-Word-Diff nötig.
+- **Tuple-Set-Vergleich aus M1 wiederbenutzt** für Indexes.
+- **Live-Smoke gegen Git-History** ist die beste Validierung — keine
+  Synthetik, echte Spec-Evolution wird rekonstruiert.
+
 ### v0.0.6 — M4 Repository-Generator + ErrorReportRepository-Pilot (2026-04-28, ~45 min)
 
 - `generateRepositoryFile(CollectionSpec)` emittiert pro Collection:
@@ -213,26 +240,6 @@ Jeder Meilenstein hat:
 - die **Lösung**: was firepack dafür generiert
 - den **Migrations-PR**: was sich in WorkBrief ändert
 - einen **Aufwand**: realistische Schätzung
-
-### M5 — `firepack diff`
-
-**Schmerz:** PR-Reviewer sehen `firepack.yaml` ändert sich, müssen aber
-mental rausfischen "ist das ein neues Feld, ein Type-Change, eine neue
-Rule?".
-
-**Lösung:** `firepack diff <old.yaml> <new.yaml>` druckt ein menschen-
-lesbares Diff: "+ workBriefs.priority added (enum), - workBriefs.dueDate
-required → optional, ~ users update rule allowlist now includes
-canBeAssigned". Auch Migration-Hints: "Action required: existing
-workBriefs without `priority` → set default `normal`".
-
-**Migrations-PR:** GitHub Action die `firepack diff` zwischen Base + PR-
-Branch laufen lässt und das Output als PR-Comment postet. Reviewer
-sehen die semantische Änderung sofort.
-
-**Aufwand:** ~1.5h.
-
----
 
 ### M6 — Watch-Mode
 

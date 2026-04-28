@@ -8,9 +8,69 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M5 — `firepack diff`. PR-Comment mit semantischem Schema-Diff
-  zwischen Base und PR-Branch (z.B. "+ workBriefs.priority added,
-  ~ users update allowlist now includes canBeAssigned").
+- M6 — Watch-mode (`firepack watch`). Auto-Regen bei Save-Events
+  via package:watcher.
+
+## [0.0.7] — 2026-04-28
+
+### Added
+- `lib/src/diff/spec_diff.dart`:
+  - `SpecDiff` model + `CollectionDiff` per modified collection
+  - `diffSpecs(oldSpec, newSpec)` walkt Collections, Fields, Indexes,
+    Queries, Rules-Slots
+  - `renderMarkdown(SpecDiff)` für PR-Comment-taugliche Output-Form
+- `firepack diff --old <a.yaml> --new <b.yaml>` CLI-Subcommand. Stdout
+  default; `--out path` schreibt in eine Datei (für GitHub-Action-
+  Comment-Body).
+- 5 neue Tests, 29/29 grün.
+
+### Output-Form
+Markdown mit Sektionen für:
+- ➕/➖ Collections added/removed
+- Pro modified Collection: tenant changed, fields ➕/➖/✏️,
+  indexes ➕/➖, queries ➕/➖, rule-changes per Slot (read/create/
+  update/delete/verbatim)
+
+Verbatim-Block-Diffs werden NUR als "verbatim block changed" gemeldet
+— die volle Inline-Diff würde PR-Comments sprengen, Reviewer pullen
+das File direkt hoch.
+
+### What we deliberately don't detect (yet)
+- Field renames — heute zeigt sich das als `- old, + new`. Wenn
+  WorkBrief-Renames häufig werden, kommt eine Rename-Hint-Syntax in
+  die Spec.
+- Reorder von fields/indexes/queries — Spec-Reihenfolge ist
+  bewusst nicht semantisch.
+- Migration-Scripts ("backfill priority field with normal") — ein-
+  fache Hint-Texte könnten kommen, aber ohne dass irgendwer den
+  Output direkt ausführen sollte.
+
+### Live-Smoke gegen WorkBrief
+Diff zwischen v0.0.1 (M1-Foundation) und v0.0.6 (current) der
+WorkBrief-Spec rendert sauber:
+- 12 Collections mit Rule-Verbatim-Changes (M2.5)
+- `errorReports` mit ➕ 2 queries (M4)
+- `issues` mit ➕ 1 index (M1 drift-fix)
+
+Genau das was die letzten 4 Iterationen gemacht haben.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Diff-Modell + Markdown-Renderer | 1h | ~20 min | 3× |
+| CLI-Subcommand + Tests | 0.5h | ~10 min | 3× |
+| Doku + Live-Smoke + Reflexion | inkl. | ~5 min | n/a |
+| **Gesamt M5** | **1.5h** | **~35 min** | **~3×** |
+
+Lessons:
+- **Tuple-Set-Vergleich für Indexes wiederverwendet** aus M1-Tests.
+  Pattern aus Bestand nehmen statt neu erfinden.
+- **Verbatim-Diff bewusst flach gehalten** — granuläres Diff im
+  Verbatim-Block würde mehr Aufwand kosten als Wert liefern, weil
+  Reviewer eh die Datei aufmacht.
+- **Live-Smoke gegen Git-History** macht den Generator sofort
+  glaubwürdig — kein synthetisches Testbeispiel, sondern echte
+  Spec-Evolution wird rekonstruiert.
 
 ## [0.0.6] — 2026-04-28
 
