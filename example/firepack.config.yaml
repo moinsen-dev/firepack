@@ -1,0 +1,24 @@
+# firepack watch config — WorkBrief consumption.
+#
+# Run from this directory:
+#   firepack watch --spec workbrief.firepack.yaml --config firepack.config.yaml
+#
+# Each target maps a generator -> output path. `collection:` filters
+# multi-file generators (models, repos) to only those collections that
+# have actually been migrated to firepack on the WorkBrief side.
+
+targets:
+
+  indexes:
+    out: ../../../ideas/work_brief/app/firestore.indexes.json
+
+  rules:
+    out: ../../../ideas/work_brief/app/firestore.rules
+
+  models:
+    out: ../../../ideas/work_brief/app/lib/firepack/models
+    collection: errorReports
+
+  repos:
+    out: ../../../ideas/work_brief/app/lib/firepack/repositories
+    collection: errorReports

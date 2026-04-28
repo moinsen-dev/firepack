@@ -8,8 +8,56 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planning
-- M6 — Watch-mode (`firepack watch`). Auto-Regen bei Save-Events
-  via package:watcher.
+- TypeScript-Types-Generator (functions/src/firepack/types/*.ts) für
+  Cloud-Functions-Side-Konsumption.
+- Pub.dev-Release sobald Spec-Format extern stabil bleibt.
+
+## [0.0.8] — 2026-04-27
+
+### Added
+- `firepack watch [--spec <path>] [--config <path>]` CLI-Subcommand:
+  - Erstes Pass-Regen aller in der Config genannten Targets, danach
+    `package:watcher`-FileWatcher auf der Spec. Save → Regen aller
+    Targets in einer Session.
+  - Optionale `firepack.config.yaml` neben der Spec deklariert
+    Targets + Out-Pfade + optionalen `collection:`-Filter (für models /
+    repos die nur einen Subset der Collections rausschreiben sollen).
+  - Ohne Config: Fallback auf `indexes → firestore.indexes.json` und
+    `rules → firestore.rules` im CWD. Reicht für die häufigste
+    Single-App-Setup.
+- `example/firepack.config.yaml` — die WorkBrief-Watch-Config (4
+  Targets: indexes + rules + models[errorReports] + repos[errorReports]).
+
+### Why this completes the planned scope
+M1-M5 hatten alle den gleichen Schmerz adressiert: jedes mal manuell
+`firepack regen --target X` für jeden Output zu tippen. Watch-Mode
+faltet das in eine Single-Loop-Session. Für WorkBrief: Spec öffnen,
+editieren, save, alle 4 Outputs sind frisch. Damit ist die
+"Spec-Driven-Loop"-These zu Ende implementiert.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| _WatchCommand + Config-Parsing | 20 min | ~8 min | ~2.5× |
+| Smoke-Tests + WorkBrief-Config | inkl. | ~3 min | n/a |
+| Doku + Reflexion | inkl. | ~3 min | n/a |
+| **Gesamt M6** | **30 min** | **~14 min** | **~2×** |
+
+Lessons:
+- **Foundation pays off (zum n-ten Mal).** Vier Generators existieren
+  schon, das Watch-Command ist nur ein Dispatch-Switch + FileWatcher-
+  Loop. Keine neue Generator-Logic.
+- **Default-Config ist wichtiger als Config-Power.** Ohne Config muss
+  `firepack watch` was Sinnvolles tun — sonst ist der Erstkontakt
+  rough. Indexes+Rules-Default ist die niedrigste-Friction-Variante.
+- **Config-File neben Spec-File ist die richtige Konvention.** Spec
+  ist source-of-truth, Config sagt wo deren Outputs landen.
+  Repository-spezifisch, deshalb nicht in der Spec selber.
+
+### Status nach M6
+Alle ursprünglich in der ROADMAP geplanten Milestones sind erreicht.
+Verbleibende Items (TypeScript-Types, Pub.dev-Release) sind keine
+weiteren WorkBrief-Schmerzen — werden gebaut sobald sie es werden.
 
 ## [0.0.7] — 2026-04-28
 

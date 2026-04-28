@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:firepack/firepack.dart';
+import 'package:watcher/watcher.dart';
+import 'package:yaml/yaml.dart';
 
 Future<void> main(List<String> args) async {
   final runner = CommandRunner<int>(
@@ -11,7 +13,8 @@ Future<void> main(List<String> args) async {
     ..addCommand(_LintCommand())
     ..addCommand(_VizCommand())
     ..addCommand(_RegenCommand())
-    ..addCommand(_DiffCommand());
+    ..addCommand(_DiffCommand())
+    ..addCommand(_WatchCommand());
 
   final exitCode = await runner.run(args) ?? 0;
   exit(exitCode);
@@ -99,6 +102,192 @@ class _VizCommand extends _SpecCommand {
 class _CliError implements Exception {
   final int exitCode;
   _CliError(this.exitCode);
+}
+
+/// Watches the spec file and re-runs the configured regen targets on
+/// every save. Lives in this file (not lib/) because it's purely CLI:
+/// reads the config, watches the FS, dispatches to the codegens.
+///
+/// Config: optional `firepack.config.yaml` next to the spec, listing
+/// which targets to regenerate and where to write each output. Without
+/// a config it falls back to writing `firestore.indexes.json` and
+/// `firestore.rules` to the CWD — useful for ad-hoc spec hacking.
+class _WatchCommand extends Command<int> {
+  _WatchCommand() {
+    argParser
+      ..addOption(
+        'spec',
+        abbr: 's',
+        help: 'Path to firepack.yaml',
+        defaultsTo: 'firepack.yaml',
+      )
+      ..addOption(
+        'config',
+        abbr: 'c',
+        help: 'Optional config YAML mapping targets → output paths. '
+            'Defaults to <spec-dir>/firepack.config.yaml if present.',
+      );
+  }
+
+  @override
+  String get name => 'watch';
+
+  @override
+  String get description =>
+      'Re-runs configured regen targets every time the spec file changes.';
+
+  @override
+  Future<int> run() async {
+    final specPath = argResults!['spec'] as String;
+    final specFile = File(specPath);
+    if (!specFile.existsSync()) {
+      stderr.writeln('firepack watch: spec not found: $specPath');
+      return 2;
+    }
+
+    final configPath = argResults!['config'] as String? ??
+        '${File(specPath).parent.path}/firepack.config.yaml';
+    final targets = _loadWatchTargets(configPath);
+    if (targets.isEmpty) {
+      stdout.writeln(
+        'firepack watch: no config — falling back to '
+        'firestore.indexes.json + firestore.rules in CWD.',
+      );
+      targets.addAll([
+        const _WatchTarget(target: 'indexes', out: 'firestore.indexes.json'),
+        const _WatchTarget(target: 'rules', out: 'firestore.rules'),
+      ]);
+    } else {
+      stdout.writeln(
+        'firepack watch: ${targets.length} target(s) from $configPath',
+      );
+    }
+
+    // First pass — write current outputs once so the project is in a
+    // consistent state before the user even saves anything.
+    _runAll(specPath, targets);
+
+    final watcher = FileWatcher(specFile.absolute.path);
+    stdout.writeln('firepack watch: watching $specPath  (Ctrl-C to exit)');
+    await for (final event in watcher.events) {
+      if (event.type == ChangeType.MODIFY ||
+          event.type == ChangeType.ADD) {
+        stdout.writeln(
+          '\nfirepack watch: spec changed at ${DateTime.now().toIso8601String()}',
+        );
+        _runAll(specPath, targets);
+      }
+    }
+    return 0;
+  }
+
+  void _runAll(String specPath, List<_WatchTarget> targets) {
+    final source = File(specPath).readAsStringSync();
+    Spec spec;
+    try {
+      spec = FirepackParser().parse(source, sourceName: specPath);
+    } catch (e) {
+      stderr.writeln('firepack watch: spec parse error — $e');
+      return;
+    }
+
+    for (final t in targets) {
+      try {
+        switch (t.target) {
+          case 'indexes':
+            File(t.out).writeAsStringSync(generateIndexesJson(spec));
+            stdout.writeln('  ✓ indexes → ${t.out}');
+          case 'rules':
+            File(t.out).writeAsStringSync(generateRulesFile(spec));
+            stdout.writeln('  ✓ rules → ${t.out}');
+          case 'models':
+            final dir = Directory(t.out);
+            if (!dir.existsSync()) dir.createSync(recursive: true);
+            final files = generateAllDartModels(spec, sourceFile: specPath);
+            files.forEach((f, c) {
+              if (t.collection != null && !_matchesCollection(f, t.collection!)) {
+                return;
+              }
+              File('${t.out}/$f').writeAsStringSync(c);
+            });
+            stdout.writeln('  ✓ models → ${t.out}');
+          case 'repos':
+            final dir = Directory(t.out);
+            if (!dir.existsSync()) dir.createSync(recursive: true);
+            final files = generateAllRepositories(spec, sourceFile: specPath);
+            files.forEach((f, c) {
+              if (t.collection != null && !_matchesCollection(f, t.collection!)) {
+                return;
+              }
+              File('${t.out}/$f').writeAsStringSync(c);
+            });
+            stdout.writeln('  ✓ repos → ${t.out}');
+          default:
+            stderr.writeln('  ✗ unknown target "${t.target}" — skipped');
+        }
+      } catch (e) {
+        stderr.writeln('  ✗ ${t.target} → $e');
+      }
+    }
+  }
+
+  bool _matchesCollection(String fileName, String collection) {
+    final stem = fileName
+        .replaceAll('_repository.dart', '')
+        .replaceAll('.dart', '');
+    return collection.toLowerCase().startsWith(stem.replaceAll('_', ''));
+  }
+
+  List<_WatchTarget> _loadWatchTargets(String path) {
+    final f = File(path);
+    if (!f.existsSync()) return [];
+    final raw = loadYaml(f.readAsStringSync());
+    if (raw is! YamlMap) return [];
+    final targets = raw['targets'];
+    if (targets is! YamlMap) return [];
+
+    final out = <_WatchTarget>[];
+    for (final entry in targets.entries) {
+      final key = entry.key.toString();
+      final body = entry.value;
+      if (body is YamlMap) {
+        out.add(_WatchTarget(
+          target: key,
+          out: body['out']?.toString() ?? _defaultOutFor(key),
+          collection: body['collection']?.toString(),
+        ));
+      } else {
+        out.add(_WatchTarget(target: key, out: _defaultOutFor(key)));
+      }
+    }
+    return out;
+  }
+
+  String _defaultOutFor(String target) {
+    switch (target) {
+      case 'indexes':
+        return 'firestore.indexes.json';
+      case 'rules':
+        return 'firestore.rules';
+      case 'models':
+        return 'lib/firepack/models';
+      case 'repos':
+        return 'lib/firepack/repositories';
+      default:
+        return target;
+    }
+  }
+}
+
+class _WatchTarget {
+  final String target;
+  final String out;
+  final String? collection;
+  const _WatchTarget({
+    required this.target,
+    required this.out,
+    this.collection,
+  });
 }
 
 class _DiffCommand extends Command<int> {

@@ -6,6 +6,46 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 
 ## Done
 
+### v0.0.8 — M6 Watch-Mode (2026-04-27, ~14 min)
+
+- `firepack watch [--spec <path>] [--config <path>]` CLI: erstes
+  Pass-Regen aller Targets, dann FileWatcher auf der Spec via
+  `package:watcher`. Save → alle Targets regenerieren.
+- Optionale `firepack.config.yaml` neben der Spec deklariert
+  `targets: { indexes: { out: ... }, rules: { out: ... }, models:
+  { out: ..., collection: <name> }, repos: { ... } }`.
+- Fallback ohne Config: `indexes → firestore.indexes.json` und
+  `rules → firestore.rules` im CWD. Reicht für Single-App-Setups.
+- `example/firepack.config.yaml` — die WorkBrief-Watch-Config (4 Targets:
+  indexes, rules, errorReports-models, errorReports-repos).
+- 29/29 Tests grün, dart analyze clean.
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| _WatchCommand + Config-Parsing | 20 min | ~8 min | ~2.5× |
+| Smoke-Tests + WorkBrief-Config | inkl. | ~3 min | n/a |
+| Doku + Reflexion | inkl. | ~3 min | n/a |
+| **Gesamt M6** | **30 min** | **~14 min** | **~2×** |
+
+Lessons:
+- **Foundation pays off (zum n-ten Mal).** Vier Generators existieren
+  schon, das Watch-Command ist nur Dispatch + FileWatcher-Loop. Keine
+  neue Generator-Logic.
+- **Default-Config ist wichtiger als Config-Power.** Erstkontakt ohne
+  Config muss schon Sinn machen. Indexes+Rules-Default = niedrigste
+  Friction.
+- **Config-File neben Spec-File ist die richtige Konvention.** Spec ist
+  Source-of-Truth, Config sagt wo deren Outputs landen — repository-
+  spezifisch, deshalb nicht in der Spec selber.
+
+**Status nach M6:** alle ursprünglich geplanten Milestones (M1-M6)
+abgeschlossen. firepack ist intern feature-complete für die heutigen
+WorkBrief-Use-Cases. Verbleibende Items (TypeScript-Types, Pub.dev-
+Release) sind keine echten Schmerzen mehr — werden gebaut sobald sie
+es werden.
+
 ### v0.0.1 — Foundation (2026-04-28, ~30 min)
 
 - YAML-Spec-Parser (148 Felder über 13 WorkBrief-Collections)
@@ -235,22 +275,9 @@ Lessons:
 
 ## Geplant — WorkBrief-driven
 
-Jeder Meilenstein hat:
-- den **Schmerz**: was in WorkBrief heute nervt
-- die **Lösung**: was firepack dafür generiert
-- den **Migrations-PR**: was sich in WorkBrief ändert
-- einen **Aufwand**: realistische Schätzung
-
-### M6 — Watch-Mode
-
-**Schmerz:** `firepack regen` manuell zu triggern beim YAML-Editieren
-nervt. Dev-Loop bricht.
-
-**Lösung:** `firepack watch` mit `package:watcher`. Triggert `regen`
-on-save. Kompatibel mit IDE-Save.
-
-**Aufwand:** ~30min. Letzte Iteration weil M1-M5 die wichtigeren
-Schmerzen sind.
+Keine geplanten Milestones aktuell. M1-M6 sind durch. Neue Milestones
+nur wenn ein WorkBrief-Schmerz **zweimal in zwei Wochen** auftritt
+(siehe Wachstums-Disziplin unten).
 
 ---
 

@@ -86,7 +86,7 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.7):**
+**Today (v0.0.8):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
@@ -94,8 +94,8 @@ diff in `firepack.yaml`.
 - ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
 - ✅ Repository + Riverpod provider codegen (typed queries from spec)
 - ✅ `firepack diff` (PR-comment-shape semantic diff)
+- ✅ `firepack watch` (auto-regen on save, multi-target via config)
 - ☐ TypeScript-types generator
-- ☐ Watch mode
 - ☐ Pub.dev release
 
 **WorkBrief consumption today:**
