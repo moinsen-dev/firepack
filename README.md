@@ -8,6 +8,13 @@
 for [WorkBrief](https://workbrief.app). Public release planned once the
 spec format stabilises (~weeks).
 
+> **Read first:**
+> - [docs/PHILOSOPHY.md](./docs/PHILOSOPHY.md) — Bootstrap-Prinzip + Non-Goals.
+>   firepack wird mit WorkBrief gebaut, nicht für WorkBrief.
+> - [docs/ROADMAP.md](./docs/ROADMAP.md) — Was als nächstes. Jeder
+>   Meilenstein löst einen WorkBrief-Schmerz.
+> - [docs/SPEC.md](./docs/SPEC.md) — Formale Spec-Reference (v1).
+
 ## What you write (one file, `firepack.yaml`)
 
 ```yaml
