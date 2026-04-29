@@ -253,6 +253,11 @@ class _WatchCommand extends Command<int> {
               File(t.out).writeAsStringSync(body);
               stdout.writeln('  ✓ paths → ${t.out}');
             }
+          case 'firestore_provider':
+            File(t.out).writeAsStringSync(
+              generateFirestoreProviderFile(sourceFile: specPath),
+            );
+            stdout.writeln('  ✓ firestore_provider → ${t.out}');
           default:
             stderr.writeln('  ✗ unknown target "${t.target}" — skipped');
         }
@@ -307,6 +312,8 @@ class _WatchCommand extends Command<int> {
         return 'lib/firepack/storage_paths.dart';
       case 'paths':
         return 'lib/firepack/paths.dart';
+      case 'firestore_provider':
+        return 'lib/firepack/firestore_provider.dart';
       default:
         return target;
     }
@@ -393,7 +400,8 @@ class _RegenCommand extends _SpecCommand {
     'models',
     'repos',
     'storage',
-    'paths'
+    'paths',
+    'firestore_provider',
   };
 
   _RegenCommand() {
@@ -403,7 +411,15 @@ class _RegenCommand extends _SpecCommand {
         abbr: 't',
         help: 'What to regenerate. Today: indexes, rules, models, '
             'repos, storage, paths.',
-        allowed: ['indexes', 'rules', 'models', 'repos', 'storage', 'paths'],
+        allowed: [
+          'indexes',
+          'rules',
+          'models',
+          'repos',
+          'storage',
+          'paths',
+          'firestore_provider'
+        ],
         defaultsTo: 'indexes',
       )
       ..addOption(
@@ -504,6 +520,9 @@ class _RegenCommand extends _SpecCommand {
         }
         content = body;
         defaultOut = 'lib/firepack/paths.dart';
+      case 'firestore_provider':
+        content = generateFirestoreProviderFile();
+        defaultOut = 'lib/firepack/firestore_provider.dart';
       default:
         return 64;
     }

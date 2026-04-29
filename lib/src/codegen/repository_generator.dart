@@ -60,6 +60,7 @@ String generateRepositoryFile(
   buf.writeln("import 'package:cloud_firestore/cloud_firestore.dart';");
   buf.writeln("import 'package:flutter_riverpod/flutter_riverpod.dart';");
   buf.writeln();
+  buf.writeln("import '../firestore_provider.dart';");
   buf.writeln("import '../paths.dart';");
   // tenant_query.dart only needed when a query actually uses the
   // tenant token (`scopedToOrg`). Skip if no query mentions it —
@@ -95,26 +96,43 @@ String generateRepositoryFile(
       .map((f) => f.name)
       .toList();
 
-  buf.writeln('  /// Sets the doc by primary-key id (overwrites existing).');
+  buf.writeln('  /// Writes the doc by primary-key id.');
+  buf.writeln('  ///');
+  buf.writeln(
+      '  /// `merge: false` (default) — full overwrite. Server-managed');
+  buf.writeln(
+      '  /// fields the model does not carry are deleted. Use this for');
+  buf.writeln('  /// creates and full-state replaces.');
+  buf.writeln('  ///');
+  buf.writeln(
+      '  /// `merge: true` — partial merge. Existing fields not present');
+  buf.writeln(
+      '  /// in the model are preserved. Use this when the client only');
+  buf.writeln('  /// holds a subset of the document.');
   if (serverNowFields.isNotEmpty) {
+    buf.writeln('  ///');
     buf.writeln('  /// Fields with `serverDefault: now` in the spec '
-        '(${serverNowFields.join(', ')}) are');
-    buf.writeln('  /// overwritten with FieldValue.serverTimestamp() — '
-        'client values are ignored.');
+        '(${serverNowFields.join(', ')})');
+    buf.writeln(
+        '  /// are overwritten with FieldValue.serverTimestamp() ONLY when');
+    buf.writeln(
+        '  /// `merge: false` — on a merge the existing server value is kept.');
   }
-  buf.writeln('  Future<void> add($cls doc) {');
+  buf.writeln('  Future<void> add($cls doc, {bool merge = false}) {');
   if (serverNowFields.isEmpty) {
     buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
     buf.writeln('        .doc(doc.id)');
-    buf.writeln('        .set(doc.toFirestore());');
+    buf.writeln('        .set(doc.toFirestore(), SetOptions(merge: merge));');
   } else {
     buf.writeln('    final data = doc.toFirestore();');
+    buf.writeln('    if (!merge) {');
     for (final name in serverNowFields) {
-      buf.writeln("    data['$name'] = FieldValue.serverTimestamp();");
+      buf.writeln("      data['$name'] = FieldValue.serverTimestamp();");
     }
+    buf.writeln('    }');
     buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
     buf.writeln('        .doc(doc.id)');
-    buf.writeln('        .set(data);');
+    buf.writeln('        .set(data, SetOptions(merge: merge));');
   }
   buf.writeln('  }');
   buf.writeln();
@@ -145,8 +163,9 @@ String generateRepositoryFile(
   // Riverpod providers
   buf.writeln();
   final repoVar = _lowerFirst(repo);
-  buf.writeln('final ${repoVar}Provider = Provider<$repo>((ref) =>');
-  buf.writeln('    $repo(FirebaseFirestore.instance));');
+  buf.writeln('final ${repoVar}Provider = Provider<$repo>(');
+  buf.writeln('  (ref) => $repo(ref.watch(firestoreProvider)),');
+  buf.writeln(');');
 
   for (final q in collection.queries.values) {
     buf.writeln();

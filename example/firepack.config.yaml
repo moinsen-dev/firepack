@@ -32,5 +32,8 @@ targets:
   paths:
     out: lib/firepack/paths.dart
 
+  firestore_provider:
+    out: lib/firepack/firestore_provider.dart
+
   viz:
     out: DATA_MODEL.md

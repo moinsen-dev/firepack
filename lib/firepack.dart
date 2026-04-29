@@ -15,4 +15,5 @@ export 'src/codegen/dart_model_generator.dart';
 export 'src/codegen/repository_generator.dart';
 export 'src/codegen/storage_paths_generator.dart';
 export 'src/codegen/firestore_paths_generator.dart';
+export 'src/codegen/firestore_provider_generator.dart';
 export 'src/diff/spec_diff.dart';

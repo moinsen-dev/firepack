@@ -55,7 +55,9 @@ collections:
       expect(out, contains('final data = doc.toFirestore();'));
       expect(
           out, contains("data['createdAt'] = FieldValue.serverTimestamp();"));
-      expect(out, contains('.set(data);'));
+      // serverTimestamp injection only on full overwrite (merge: false)
+      expect(out, contains('if (!merge)'));
+      expect(out, contains('.set(data, SetOptions(merge: merge));'));
     });
 
     test('add() uses plain .set(doc.toFirestore()) without serverDefault', () {
@@ -71,8 +73,43 @@ collections:
       watchAll: { byId: true }
 ''');
       final out = generateRepositoryFile(spec.collections['posts']!);
-      expect(out, contains('.set(doc.toFirestore());'));
+      expect(
+          out, contains('.set(doc.toFirestore(), SetOptions(merge: merge));'));
       expect(out, isNot(contains('FieldValue.serverTimestamp()')));
+    });
+
+    test('add() takes a merge parameter (default false)', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id: { type: string, primaryKey: true }
+    queries:
+      watchById: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains('Future<void> add(Post doc, {bool merge = false})'));
+    });
+
+    test('repo provider depends on firestoreProvider (not direct instance)',
+        () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id: { type: string, primaryKey: true }
+    queries:
+      watchById: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains("import '../firestore_provider.dart';"));
+      expect(out, contains('ref.watch(firestoreProvider)'));
+      expect(
+          out, isNot(contains('PostRepository(FirebaseFirestore.instance)')));
     });
 
     test('repos use fromFirestore (not fromJson) for reads', () {
@@ -160,7 +197,7 @@ collections:
       id: { type: string, primaryKey: true }
 ''');
       final out = generateRepositoryFile(spec.collections['posts']!);
-      expect(out, contains('Future<void> add(Post doc)'));
+      expect(out, contains('Future<void> add(Post doc, {bool merge = false})'));
       expect(
           out,
           contains(

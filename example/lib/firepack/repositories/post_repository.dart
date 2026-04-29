@@ -9,6 +9,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../firestore_provider.dart';
 import '../paths.dart';
 import '../tenant_query.dart';
 import '../models/post.dart';
@@ -38,13 +39,28 @@ class PostRepository {
       _firestore.collection(FirestorePaths.posts).doc(id).snapshots().map((d) =>
           d.exists ? Post.fromFirestore({...?d.data(), 'id': d.id}) : null);
 
-  /// Sets the doc by primary-key id (overwrites existing).
-  /// Fields with `serverDefault: now` in the spec (createdAt) are
-  /// overwritten with FieldValue.serverTimestamp() — client values are ignored.
-  Future<void> add(Post doc) {
+  /// Writes the doc by primary-key id.
+  ///
+  /// `merge: false` (default) — full overwrite. Server-managed
+  /// fields the model does not carry are deleted. Use this for
+  /// creates and full-state replaces.
+  ///
+  /// `merge: true` — partial merge. Existing fields not present
+  /// in the model are preserved. Use this when the client only
+  /// holds a subset of the document.
+  ///
+  /// Fields with `serverDefault: now` in the spec (createdAt)
+  /// are overwritten with FieldValue.serverTimestamp() ONLY when
+  /// `merge: false` — on a merge the existing server value is kept.
+  Future<void> add(Post doc, {bool merge = false}) {
     final data = doc.toFirestore();
-    data['createdAt'] = FieldValue.serverTimestamp();
-    return _firestore.collection(FirestorePaths.posts).doc(doc.id).set(data);
+    if (!merge) {
+      data['createdAt'] = FieldValue.serverTimestamp();
+    }
+    return _firestore
+        .collection(FirestorePaths.posts)
+        .doc(doc.id)
+        .set(data, SetOptions(merge: merge));
   }
 
   /// Patches a subset of fields without round-tripping the model.
@@ -61,7 +77,8 @@ class PostRepository {
 }
 
 final postRepositoryProvider = Provider<PostRepository>(
-    (ref) => PostRepository(FirebaseFirestore.instance));
+  (ref) => PostRepository(ref.watch(firestoreProvider)),
+);
 
 final postWatchByOrgProvider = StreamProvider.family<List<Post>, String>(
     (ref, orgId) => ref.watch(postRepositoryProvider).watchByOrg(orgId));

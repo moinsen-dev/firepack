@@ -124,14 +124,12 @@ the create instead, or drop `serverDefault` from the field.
 
 ## Open code-review findings (carry forward)
 
-- **`add()` is overwrite-set, not merge.** Calling `add()` with an
-  existing id silently nukes server-only fields the model doesn't
-  carry. Real fix: emit a separate `set(post, {SetOptions})`-aware
-  method, or rename `add` to make the overwrite semantics obvious.
-  Documented but not yet codegen-encoded.
-- **`PostRepository(FirebaseFirestore.instance)` is hardcoded in the
-  generated provider.** DI is only possible via Riverpod
-  `overrideWithValue`. Acceptable today but worth exposing more
-  obviously when more consumers land.
 - **Transactions / batch writes are not generated.** Real-world
-  Firestore apps need them. Roadmap.
+  Firestore apps need them — multi-doc consistency, atomic counters,
+  fan-out writes. firepack today stops at single-doc CRUD. Spec-level
+  design needed: probably a `transactions:` block declaring participating
+  collections + ordering. Defer until WorkBrief surfaces the pain.
+- **No multi-tenant-field support.** All collections sharing one
+  `tenant: organizationId` works; mixing `tenant: orgId` + `tenant:
+  customerId` in the same spec would break the assumption that
+  `scopedToOrg(orgId)` covers all tenant-scoped queries.

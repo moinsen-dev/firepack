@@ -13,6 +13,49 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pub.dev-Release sobald Spec-Format extern stabil bleibt.
 - CI für firepack selbst (GitHub Actions: pub get + analyze + test).
 
+## [0.0.15] — 2026-04-29
+
+### Added
+- **`firestoreProvider` Codegen (M11.1).** Neuer regen-Target
+  `firestore_provider`, default-out
+  `lib/firepack/firestore_provider.dart`. Eine zentrale
+  `Provider<FirebaseFirestore>` die alle generierten Repository-
+  Provider als Source nutzen. Override einmal → alle Repos sehen die
+  neue Instance. Vorher: jeder Repo-Provider baked
+  `FirebaseFirestore.instance` direkt ein, Tests/Multi-DB/Staging-
+  Switches mussten jeden Provider einzeln overriden.
+- **`add(doc, {merge = false})` Parameter (M11.2).** Repository
+  `add()` nimmt jetzt `merge: bool` mit Default `false`
+  (backward-compat: voller Overwrite-Set wie bisher). Mit
+  `merge: true` wird `SetOptions(merge: true)` weitergereicht —
+  preserve server-managed fields the model doesn't carry.
+  `serverDefault: now`-Felder werden nur bei `merge: false`
+  überschrieben (sonst bleibt der Server-Wert erhalten).
+
+### Changed
+- Generated Repository-Provider: `(ref) => Repo(ref.watch(firestoreProvider))`
+  statt `Repo(FirebaseFirestore.instance)`. Repos importieren jetzt
+  `'../firestore_provider.dart'`.
+
+### Reflexion
+| Phase | Schätzung | Realität |
+|---|---|---|
+| firestore_provider-Codegen + Wiring | 8 min | ~5 min |
+| add(merge:)-Param + serverDefault-Branch + Tests | 8 min | ~6 min |
+| Example-Regen + Verify | 3 min | ~2 min |
+| **Gesamt M11** | **19 min** | **~13 min** |
+
+### WorkBrief-Konsumption
+- Folgender Migrations-Schritt dort: `firepack regen --target firestore_provider`
+  einmal laufen lassen, alte hand-written firestore-Singletons in
+  Riverpod-Setup über `firestoreProvider.overrideWithValue(...)` lenken.
+
+### Lessons
+- **Ein Provider-Layer beats N hardcoded singletons.** Die
+  Hardcoding-Lücke war auch in WorkBrief-Tests sichtbar (jeder
+  Mock-Setup musste 13 Repo-Provider overriden). Mit dem
+  zentralen `firestoreProvider` schrumpft das auf einen Override.
+
 ## [0.0.14] — 2026-04-29
 
 ### Added

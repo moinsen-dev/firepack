@@ -63,12 +63,13 @@ viz-example:
 # Run after touching a generator or the example spec — the generated tree
 # is checked in so `flutter analyze` works on a fresh clone.
 example-regen:
-    dart run bin/firepack.dart regen --target paths   --spec example/firepack.yaml --out example/lib/firepack/paths.dart
-    dart run bin/firepack.dart regen --target models  --spec example/firepack.yaml --out example/lib/firepack/models
-    dart run bin/firepack.dart regen --target repos   --spec example/firepack.yaml --out example/lib/firepack/repositories
-    dart run bin/firepack.dart regen --target storage --spec example/firepack.yaml --out example/lib/firepack/storage_paths.dart
-    dart run bin/firepack.dart regen --target rules   --spec example/firepack.yaml --out example/firestore.rules
-    dart run bin/firepack.dart regen --target indexes --spec example/firepack.yaml --out example/firestore.indexes.json
+    dart run bin/firepack.dart regen --target paths              --spec example/firepack.yaml --out example/lib/firepack/paths.dart
+    dart run bin/firepack.dart regen --target firestore_provider --spec example/firepack.yaml --out example/lib/firepack/firestore_provider.dart
+    dart run bin/firepack.dart regen --target models             --spec example/firepack.yaml --out example/lib/firepack/models
+    dart run bin/firepack.dart regen --target repos              --spec example/firepack.yaml --out example/lib/firepack/repositories
+    dart run bin/firepack.dart regen --target storage            --spec example/firepack.yaml --out example/lib/firepack/storage_paths.dart
+    dart run bin/firepack.dart regen --target rules              --spec example/firepack.yaml --out example/firestore.rules
+    dart run bin/firepack.dart regen --target indexes            --spec example/firepack.yaml --out example/firestore.indexes.json
 
 # Pull Flutter deps for the example app
 example-deps:
