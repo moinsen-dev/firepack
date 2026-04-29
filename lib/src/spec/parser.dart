@@ -158,6 +158,7 @@ class FirepackParser {
       );
     }
 
+    final className = node['className']?.toString();
     final tenant = node['tenant']?.toString();
 
     final fieldsNode = node['fields'];
@@ -197,6 +198,7 @@ class FirepackParser {
 
     return CollectionSpec(
       name: name,
+      className: className,
       tenant: tenant,
       fields: fields,
       indexes: indexes,

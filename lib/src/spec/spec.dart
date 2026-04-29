@@ -105,6 +105,13 @@ class NestedTypeSpec {
 class CollectionSpec {
   final String name;
 
+  /// Optional override for the generated Dart class name. When unset,
+  /// firepack uses its default convention (collection name singularised
+  /// + PascalCase: `workBriefs` → `WorkBrief`). Use this when an
+  /// existing codebase has a different convention you want to keep
+  /// (e.g. `auditLogs` → `AuditLogEntry` rather than `AuditLog`).
+  final String? className;
+
   /// Field name on this collection that scopes documents to a tenant.
   /// When set, queries auto-include `where(tenant, ==, tenantId)` and
   /// rules auto-check `request.auth.token.{role}.{org} == tenant`.
@@ -119,6 +126,7 @@ class CollectionSpec {
 
   const CollectionSpec({
     required this.name,
+    this.className,
     this.tenant,
     required this.fields,
     this.indexes = const [],

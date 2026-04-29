@@ -47,9 +47,9 @@ String generateRepositoryFile(
   CollectionSpec collection, {
   String? sourceFile,
 }) {
-  final cls = _classNameFor(collection.name);
+  final cls = collection.className ?? _classNameFor(collection.name);
   final repo = '${cls}Repository';
-  final modelImport = _modelImportFor(collection.name);
+  final modelImport = _modelImportFor(collection);
   final pathToken = collection.name; // matches FirestorePaths.<name>
 
   final buf = StringBuffer();
@@ -322,9 +322,17 @@ String _classNameFor(String collectionName) {
   return singular[0].toUpperCase() + singular.substring(1);
 }
 
-String _modelImportFor(String collectionName) {
-  // workBriefs → ../models/work_brief.dart
-  final snake = collectionName.replaceAllMapped(
+String _modelImportFor(CollectionSpec c) {
+  // Respect className override: AuditLogEntry → audit_log_entry.dart;
+  // otherwise default convention: workBriefs → work_brief.dart.
+  if (c.className != null) {
+    final snake = c.className!.replaceAllMapped(
+      RegExp(r'(?<=.)([A-Z])'),
+      (m) => '_${m.group(0)!.toLowerCase()}',
+    ).toLowerCase();
+    return '../models/$snake.dart';
+  }
+  final snake = c.name.replaceAllMapped(
     RegExp(r'[A-Z]'),
     (m) => '_${m.group(0)!.toLowerCase()}',
   );
@@ -357,8 +365,16 @@ Map<String, String> generateAllRepositories(
   final out = <String, String>{};
   for (final c in spec.collections.values) {
     if (c.queries.isEmpty) continue;
-    final fileName = _fileNameFor(c.name);
+    final fileName = c.className != null
+        ? '${_classNameToSnake(c.className!)}_repository.dart'
+        : _fileNameFor(c.name);
     out[fileName] = generateRepositoryFile(c, sourceFile: sourceFile);
   }
   return out;
 }
+
+String _classNameToSnake(String className) =>
+    className.replaceAllMapped(
+      RegExp(r'(?<=.)([A-Z])'),
+      (m) => '_${m.group(0)!.toLowerCase()}',
+    ).toLowerCase();

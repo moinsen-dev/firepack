@@ -23,7 +23,7 @@ import '../spec/spec.dart';
 ///   M8.3 with a `types:`-block in the spec
 /// - sentinel-based copyWith (set optional field explicitly to null)
 String generateDartModel(CollectionSpec collection, {String? sourceFile}) {
-  final cls = _classNameFor(collection.name);
+  final cls = collection.className ?? _classNameFor(collection.name);
   return _emitFile(cls, collection.fields, sourceFile: sourceFile);
 }
 
@@ -44,11 +44,25 @@ String _emitFile(
   buf.writeln(_header(sourceFile));
 
   // Imports — pull in any nested-type files this class references.
+  // Also re-export them so a consumer that imports this model file
+  // automatically sees the related enum / nested-type names without
+  // needing to know which file each lives in.
   final imports = _collectImports(fields);
   if (imports.isNotEmpty) {
     buf.writeln();
+    // Suppress unnecessary_import: nested-type files re-export
+    // enums.dart, so direct enums.dart imports look redundant — they
+    // are not (the outer class uses the enums directly).
+    if (imports.length > 1) {
+      buf.writeln('// ignore_for_file: unnecessary_import');
+      buf.writeln();
+    }
     for (final imp in imports) {
       buf.writeln("import '$imp';");
+    }
+    buf.writeln();
+    for (final imp in imports) {
+      buf.writeln("export '$imp';");
     }
   }
   buf.writeln();
@@ -520,7 +534,11 @@ Map<String, String> generateAllDartModels(
 }) {
   final out = <String, String>{};
   for (final c in spec.collections.values) {
-    final fileName = _fileNameFor(c.name);
+    // When className is overridden, derive the filename from the
+    // class name so AuditLogEntry → audit_log_entry.dart.
+    final fileName = c.className != null
+        ? '${_nestedFileName(c.className!)}.dart'
+        : _fileNameFor(c.name);
     out[fileName] = generateDartModel(c, sourceFile: sourceFile);
   }
   for (final t in spec.types.values) {
