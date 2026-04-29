@@ -114,5 +114,99 @@ collections:
       expect(out.keys, contains('with_querie_repository.dart'));
       expect(out.keys, isNot(contains('without_querie_repository.dart')));
     });
+
+    test('emits whereIn const-list for "field in [a, b, c]"', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  things:
+    tenant: orgId
+    fields:
+      id:    { type: string, primaryKey: true }
+      orgId: { type: string, required: true }
+      status: { type: string, required: true }
+    queries:
+      watchActive:
+        where: [tenant, "status in [open, in_review, blocked]"]
+''');
+      final out = generateRepositoryFile(spec.collections['things']!);
+      expect(out, contains('Stream<List<Thing>> watchActive(String orgId)'));
+      expect(
+        out,
+        contains(".where('status', whereIn: const ['open', 'in_review', 'blocked'])"),
+      );
+    });
+
+    test('emits whereIn with List<String> arg for "field in \$param"', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  things:
+    tenant: orgId
+    fields:
+      id:    { type: string, primaryKey: true }
+      orgId: { type: string, required: true }
+      status: { type: string, required: true }
+    queries:
+      watchByStatuses:
+        where: [tenant, "status in \$statuses"]
+''');
+      final out = generateRepositoryFile(spec.collections['things']!);
+      expect(
+        out,
+        contains(
+            'Stream<List<Thing>> watchByStatuses(String orgId, List<String> statuses)'),
+      );
+      expect(out, contains(".where('status', whereIn: statuses)"));
+      // Provider should be a record-typed family with List<String> arg.
+      expect(
+        out,
+        contains('({String orgId, List<String> statuses})'),
+      );
+    });
+
+    test('honours className override in generated class + filename', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  auditLogs:
+    className: AuditLogEntry
+    tenant: orgId
+    fields:
+      id:    { type: string, primaryKey: true }
+      orgId: { type: string, required: true }
+    queries:
+      watchByOrg:
+        where: [tenant]
+''');
+      final files = generateAllRepositories(spec);
+      expect(files.keys, contains('audit_log_entry_repository.dart'));
+      final body = files['audit_log_entry_repository.dart']!;
+      expect(body, contains('class AuditLogEntryRepository'));
+      expect(body, contains('Stream<List<AuditLogEntry>> watchByOrg'));
+      expect(body, contains('auditLogEntryWatchByOrgProvider'));
+    });
+
+    test('skips tenant_query.dart import when no query uses tenant', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  things:
+    tenant: orgId
+    fields:
+      id:        { type: string, primaryKey: true }
+      orgId:     { type: string, required: true }
+      parentId:  { type: string, required: true }
+    queries:
+      watchByParent:
+        where: ["parentId == \$parentId"]
+''');
+      final out = generateRepositoryFile(spec.collections['things']!);
+      expect(out, isNot(contains('tenant_query.dart')));
+    });
   });
 }

@@ -34,6 +34,8 @@ import '../spec/spec.dart';
 ///   where: ["<field> == <literal>"]          → .where(field, isEqualTo: literal)
 ///   where: ["<field> == \$<param>"]          → param via method arg
 ///   where: ["<field> contains: \$<param>"]   → arrayContains
+///   where: ["<field> in [a, b, c]"]          → whereIn (literal const list)
+///   where: ["<field> in \$<param>"]          → whereIn (List<String> arg)
 ///   orderBy: <field>:asc|desc                → .orderBy(field, descending)
 ///   limit: <int>                             → .limit(int)
 ///   byId: true                               → emits watchById(String id)
@@ -150,10 +152,18 @@ class _ParsedQuery {
 
 class _WherePart {
   final String field;
-  final String op; // 'isEqualTo' | 'arrayContains' | 'literalEquals'
+  /// 'isEqualTo' | 'arrayContains' | 'literalEquals' | 'whereInLiteral' | 'whereInParam'
+  final String op;
   final String? param; // when present, becomes a method arg
-  final String? literal; // when present, inlined
-  _WherePart({required this.field, required this.op, this.param, this.literal});
+  final String? literal; // single literal for `field == X`
+  final List<String>? literalList; // whereIn literal `field in [a,b,c]`
+  _WherePart({
+    required this.field,
+    required this.op,
+    this.param,
+    this.literal,
+    this.literalList,
+  });
 }
 
 _ParsedQuery _parseQuery(QuerySpec q) {
@@ -173,6 +183,42 @@ _ParsedQuery _parseQuery(QuerySpec q) {
         field: containsMatch.group(1)!,
         op: 'arrayContains',
         param: containsMatch.group(2),
+      ));
+      continue;
+    }
+    // "field in [a, b, c]" — literal list, inlined as const at codegen
+    final whereInLitMatch =
+        RegExp(r'^(\w+)\s+in\s*\[(.*)\]$').firstMatch(s);
+    if (whereInLitMatch != null) {
+      final field = whereInLitMatch.group(1)!;
+      final inner = whereInLitMatch.group(2)!;
+      final values = inner
+          .split(',')
+          .map((v) => v.trim())
+          .map((v) {
+            if ((v.startsWith("'") && v.endsWith("'")) ||
+                (v.startsWith('"') && v.endsWith('"'))) {
+              return v.substring(1, v.length - 1);
+            }
+            return v;
+          })
+          .where((v) => v.isNotEmpty)
+          .toList();
+      pq.wheres.add(_WherePart(
+        field: field,
+        op: 'whereInLiteral',
+        literalList: values,
+      ));
+      continue;
+    }
+    // "field in $param" — parameterized list, method gets List<String>
+    final whereInParamMatch =
+        RegExp(r'^(\w+)\s+in\s+\$(\w+)$').firstMatch(s);
+    if (whereInParamMatch != null) {
+      pq.wheres.add(_WherePart(
+        field: whereInParamMatch.group(1)!,
+        op: 'whereInParam',
+        param: whereInParamMatch.group(2),
       ));
       continue;
     }
@@ -235,7 +281,11 @@ String _emitQueryMethod(
   final params = <String>[];
   if (pq.wantsTenant) params.add('String orgId');
   for (final w in pq.wheres) {
-    if (w.param != null) params.add('String ${w.param}');
+    if (w.param != null) {
+      // whereInParam → List<String>; isEqualTo / arrayContains → String
+      final paramType = w.op == 'whereInParam' ? 'List<String>' : 'String';
+      params.add('$paramType ${w.param}');
+    }
   }
 
   final paramStr = params.join(', ');
@@ -256,6 +306,12 @@ String _emitQueryMethod(
           '          .where(\'${w.field}\', isEqualTo: \'${w.literal}\')');
     } else if (w.op == 'arrayContains' && w.param != null) {
       buf.write('          .where(\'${w.field}\', arrayContains: ${w.param})');
+    } else if (w.op == 'whereInLiteral' && w.literalList != null) {
+      final values = w.literalList!.map((v) => "'$v'").join(', ');
+      buf.write(
+          '          .where(\'${w.field}\', whereIn: const [$values])');
+    } else if (w.op == 'whereInParam' && w.param != null) {
+      buf.write('          .where(\'${w.field}\', whereIn: ${w.param})');
     }
   }
   if (pq.orderByField != null) {
@@ -282,10 +338,14 @@ String _emitQueryProvider(QuerySpec q, String cls, String repoVar) {
   }
 
   final pq = _parseQuery(q);
-  final params = <String>[];
-  if (pq.wantsTenant) params.add('orgId');
+  // Track (name, dartType) per param.
+  final params = <({String name, String type})>[];
+  if (pq.wantsTenant) params.add((name: 'orgId', type: 'String'));
   for (final w in pq.wheres) {
-    if (w.param != null) params.add(w.param!);
+    if (w.param != null) {
+      final paramType = w.op == 'whereInParam' ? 'List<String>' : 'String';
+      params.add((name: w.param!, type: paramType));
+    }
   }
 
   if (params.isEmpty) {
@@ -295,14 +355,16 @@ String _emitQueryProvider(QuerySpec q, String cls, String repoVar) {
   }
 
   if (params.length == 1) {
-    return 'final $providerName = StreamProvider.family<List<$cls>, String>(\n'
-        '    (ref, ${params.first}) => ref.watch(${repoVar}Provider).${q.name}(${params.first}));';
+    final p = params.first;
+    return 'final $providerName = StreamProvider.family<List<$cls>, ${p.type}>(\n'
+        '    (ref, ${p.name}) => ref.watch(${repoVar}Provider).${q.name}(${p.name}));';
   }
 
   // Multi-param: emit as a record-typed family.
   // Riverpod 2.x supports this via Dart record types.
-  final argsRecord = '({${params.map((p) => 'String $p').join(', ')}})';
-  final argDestructure = params.map((p) => 'args.$p').join(', ');
+  final argsRecord =
+      '({${params.map((p) => '${p.type} ${p.name}').join(', ')}})';
+  final argDestructure = params.map((p) => 'args.${p.name}').join(', ');
   return 'final $providerName = StreamProvider.family<List<$cls>, $argsRecord>(\n'
       '    (ref, args) => ref.watch(${repoVar}Provider).${q.name}($argDestructure));';
 }
