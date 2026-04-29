@@ -2,7 +2,7 @@ import '../spec/spec.dart';
 
 /// Generates a single Dart model file per collection.
 ///
-/// **Output shape (v0.0.5, minimal):**
+/// **Output shape (v0.0.10):**
 /// - one immutable Dart class with `final` fields
 /// - const constructor with named parameters (required where the spec
 ///   marked the field required, defaulted where the spec gave a default)
@@ -10,41 +10,67 @@ import '../spec/spec.dart';
 ///   enums → `.name`, omit-if-null for optional fields
 /// - `factory fromJson(...)` — DateTime.parse, enum.values.byName,
 ///   defaults applied for absent or null fields
+/// - `copyWith({...})` with simple pattern (named optional, falls back
+///   to current value). Cannot set non-null optional fields to null —
+///   document that path explicitly via a setter call if needed.
+/// - `operator ==` / `hashCode` — value equality. List + Map compared
+///   deep via private `_listEq` / `_mapEq` helpers (no external deps).
 /// - generated `enum` classes for every `enum`-typed field, named
 ///   `<ClassName><FieldNamePascal>` (e.g. `ErrorReportLevel`)
 ///
-/// **Not yet (v0.0.5):**
-/// - `copyWith` — most consumers can rebuild via constructor; added in
-///   v0.0.6 once the `editing-flows-want-it` pain is real
-/// - `==` / `hashCode` — same reasoning
-/// - nested freezed-style types (`list[DraftTask]`) — currently emitted
-///   as `List<dynamic>` because the spec doesn't formally model nested
-///   types yet; lifted in a future iteration as the pattern repeats
+/// **Not yet:**
+/// - nested freezed-style types (`list[type[DraftTask]]`) — landing in
+///   M8.3 with a `types:`-block in the spec
+/// - sentinel-based copyWith (set optional field explicitly to null)
 String generateDartModel(CollectionSpec collection, {String? sourceFile}) {
   final cls = _classNameFor(collection.name);
-  final buf = StringBuffer();
+  return _emitFile(cls, collection.fields, sourceFile: sourceFile);
+}
 
+/// Generates a Dart class for a [NestedTypeSpec]. Same shape as a
+/// collection model but the class name is the type-name verbatim
+/// (no s-stripping / pascal-casing — `WorkBriefTask` stays `WorkBriefTask`).
+String generateNestedTypeModel(NestedTypeSpec type, {String? sourceFile}) {
+  return _emitFile(type.name, type.fields, sourceFile: sourceFile);
+}
+
+/// Internal: emit one Dart file with a class body + imports + helpers.
+String _emitFile(
+  String cls,
+  Map<String, FieldSpec> fields, {
+  String? sourceFile,
+}) {
+  final buf = StringBuffer();
   buf.writeln(_header(sourceFile));
+
+  // Imports — pull in any nested-type files this class references.
+  final imports = _collectImports(fields);
+  if (imports.isNotEmpty) {
+    buf.writeln();
+    for (final imp in imports) {
+      buf.writeln("import '$imp';");
+    }
+  }
   buf.writeln();
 
-  // Generated enum classes — one per enum-typed field, declared first
-  // so the main class can reference them as types.
-  for (final f in collection.fields.values) {
-    if (f.type == FieldType.enum_) {
+  // Per-class generated enum classes — only for inline enums. Shared
+  // enums (enumRef set) live in the imported `enums.dart`.
+  for (final f in fields.values) {
+    if (f.type == FieldType.enum_ && f.enumRef == null) {
       buf.writeln(_emitEnum(cls, f));
       buf.writeln();
     }
   }
 
   buf.writeln('class $cls {');
-  for (final f in collection.fields.values) {
+  for (final f in fields.values) {
     buf.writeln('  final ${_dartType(cls, f)} ${f.name};');
   }
   buf.writeln();
 
   // const constructor
   buf.writeln('  const $cls({');
-  for (final f in collection.fields.values) {
+  for (final f in fields.values) {
     final isReq = f.required || f.primaryKey;
     final hasDefault = f.defaultValue != null;
     final keyword = isReq && !hasDefault ? 'required ' : '';
@@ -56,9 +82,23 @@ String generateDartModel(CollectionSpec collection, {String? sourceFile}) {
   buf.writeln('  });');
   buf.writeln();
 
+  // copyWith
+  buf.writeln('  $cls copyWith({');
+  for (final f in fields.values) {
+    final t = _dartType(cls, f);
+    final paramType = t.endsWith('?') ? t : '$t?';
+    buf.writeln('    $paramType ${f.name},');
+  }
+  buf.writeln('  }) => $cls(');
+  for (final f in fields.values) {
+    buf.writeln('    ${f.name}: ${f.name} ?? this.${f.name},');
+  }
+  buf.writeln('  );');
+  buf.writeln();
+
   // toJson
   buf.writeln('  Map<String, dynamic> toJson() => {');
-  for (final f in collection.fields.values) {
+  for (final f in fields.values) {
     final omitIfNull = f.optional && !f.required;
     final access = f.name;
     final ser = _toJsonExpr(access, f);
@@ -73,15 +113,151 @@ String generateDartModel(CollectionSpec collection, {String? sourceFile}) {
 
   // fromJson
   buf.writeln('  factory $cls.fromJson(Map<String, dynamic> json) => $cls(');
-  for (final f in collection.fields.values) {
+  for (final f in fields.values) {
     final readExpr = _fromJsonExpr("json['${f.name}']", f, cls);
     buf.writeln('    ${f.name}: $readExpr,');
   }
   buf.writeln('  );');
+  buf.writeln();
+
+  // operator ==
+  buf.writeln('  @override');
+  buf.writeln('  bool operator ==(Object other) =>');
+  buf.writeln('      identical(this, other) ||');
+  buf.writeln('      other is $cls &&');
+  buf.writeln('          runtimeType == other.runtimeType${fields.isEmpty ? ';' : ' &&'}');
+  final fieldList = fields.values.toList();
+  for (var i = 0; i < fieldList.length; i++) {
+    final f = fieldList[i];
+    final tail = i == fieldList.length - 1 ? ';' : ' &&';
+    final cmp = _eqExpr(f);
+    buf.writeln('          $cmp$tail');
+  }
+  buf.writeln();
+
+  // hashCode
+  buf.writeln('  @override');
+  if (fieldList.length <= 20) {
+    buf.writeln('  int get hashCode => Object.hash(');
+    for (var i = 0; i < fieldList.length; i++) {
+      final f = fieldList[i];
+      final last = i == fieldList.length - 1;
+      buf.writeln('        ${_hashExpr(f)}${last ? '' : ','}');
+    }
+    buf.writeln('      );');
+  } else {
+    buf.writeln('  int get hashCode => Object.hashAll([');
+    for (final f in fieldList) {
+      buf.writeln('        ${_hashExpr(f)},');
+    }
+    buf.writeln('      ]);');
+  }
+
   buf.writeln('}');
+
+  // Collection-equality helpers — only emit the variant actually used.
+  final hasList = fields.values.any((f) => f.type == FieldType.list);
+  final hasMap = fields.values.any((f) => f.type == FieldType.map);
+  if (hasList || hasMap) {
+    buf.writeln();
+    if (hasList) buf.writeln(_listEqHelper());
+    if (hasMap) {
+      if (hasList) buf.writeln();
+      buf.writeln(_mapEqHelper());
+    }
+  }
 
   return buf.toString();
 }
+
+/// Returns relative-import paths the generated class needs — one
+/// entry per referenced nested type, plus `enums.dart` if any field
+/// uses a shared enum. All generated files live next to each other in
+/// the same directory, so leaf-only paths are enough.
+Set<String> _collectImports(Map<String, FieldSpec> fields) {
+  final imports = <String>{};
+  for (final f in fields.values) {
+    final ref = f.nestedTypeRef ?? f.itemSpec?.nestedTypeRef;
+    if (ref != null) {
+      imports.add('${_nestedFileName(ref)}.dart');
+    }
+    if (f.enumRef != null) {
+      imports.add('enums.dart');
+    }
+  }
+  return imports;
+}
+
+/// Generates a single `enums.dart` file containing every shared enum
+/// declared under `Spec.enums`. Models that reference a shared enum
+/// import this file. Returns null when the spec has no shared enums.
+String? generateSharedEnumsFile(Spec spec, {String? sourceFile}) {
+  if (spec.enums.isEmpty) return null;
+  final buf = StringBuffer();
+  buf.writeln(_header(sourceFile));
+  buf.writeln();
+  buf.writeln('// Shared enums — referenced from models via `enum[<Name>]`.');
+  buf.writeln();
+  for (final e in spec.enums.values) {
+    buf.writeln('enum ${e.name} { ${e.values.join(", ")} }');
+    buf.writeln();
+  }
+  return buf.toString();
+}
+
+String _nestedFileName(String typeName) {
+  // WorkBriefTask → work_brief_task; ChecklistItem → checklist_item
+  return typeName.replaceAllMapped(
+    RegExp(r'(?<=.)([A-Z])'),
+    (m) => '_${m.group(0)!.toLowerCase()}',
+  ).toLowerCase();
+}
+
+String _eqExpr(FieldSpec f) {
+  final n = f.name;
+  if (f.type == FieldType.list) return '_listEq($n, other.$n)';
+  if (f.type == FieldType.map) return '_mapEq($n, other.$n)';
+  return '$n == other.$n';
+}
+
+String _hashExpr(FieldSpec f) {
+  final n = f.name;
+  final isNullable = f.optional && !f.required && !f.primaryKey;
+  if (f.type == FieldType.list) {
+    return isNullable
+        ? 'Object.hashAll($n ?? const [])'
+        : 'Object.hashAll($n)';
+  }
+  if (f.type == FieldType.map) {
+    final src = isNullable ? '($n ?? const {})' : n;
+    return 'Object.hashAllUnordered($src.entries.map((e) => Object.hash(e.key, e.value)))';
+  }
+  return n;
+}
+
+String _listEqHelper() => '''
+// Deep list equality — private to this file (no external deps).
+bool _listEq(List<dynamic>? a, List<dynamic>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}''';
+
+String _mapEqHelper() => '''
+// Deep map equality — private to this file (no external deps).
+bool _mapEq(Map<String, dynamic>? a, Map<String, dynamic>? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  if (a.length != b.length) return false;
+  for (final k in a.keys) {
+    if (!b.containsKey(k) || a[k] != b[k]) return false;
+  }
+  return true;
+}''';
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -132,18 +308,20 @@ String _dartType(String className, FieldSpec f) {
     case FieldType.dateTime:
       base = 'DateTime';
     case FieldType.enum_:
-      base = _enumNameFor(className, f.name);
+      // Shared enum (enum[Name]) → use the shared name; inline enum
+      // → use the per-class generated name.
+      base = f.enumRef ?? _enumNameFor(className, f.name);
     case FieldType.ref:
       // Refs serialise as doc-id strings.
       base = 'String';
     case FieldType.list:
-      // We don't track structured item types yet — fall back to the
-      // most-common case (List<String>) when item is string or ref,
-      // List<dynamic> otherwise. In WorkBrief most lists are exactly
-      // these two shapes (fcmTokens, requiredTools, assignedUserIds).
+      // List<X> based on inner item spec — string/ref → List<String>,
+      // nested type → List<NestedTypeName>, fallback → List<dynamic>.
       final inner = f.itemSpec;
       if (inner != null) {
-        if (inner.type == FieldType.string || inner.type == FieldType.ref) {
+        if (inner.nestedTypeRef != null) {
+          base = 'List<${inner.nestedTypeRef}>';
+        } else if (inner.type == FieldType.string || inner.type == FieldType.ref) {
           base = 'List<String>';
         } else {
           base = 'List<dynamic>';
@@ -153,6 +331,8 @@ String _dartType(String className, FieldSpec f) {
       }
     case FieldType.map:
       base = 'Map<String, dynamic>';
+    case FieldType.nestedType:
+      base = f.nestedTypeRef!;
   }
 
   // Required + default → non-nullable (the constructor enforces required).
@@ -174,7 +354,7 @@ String _dartLiteral(dynamic value, FieldSpec f, String className) {
     return 'const [$items]';
   }
   if (f.type == FieldType.enum_) {
-    final enumName = _enumNameFor(className, f.name);
+    final enumName = f.enumRef ?? _enumNameFor(className, f.name);
     return '$enumName.$value';
   }
   // strings — quote and escape minimally
@@ -183,13 +363,25 @@ String _dartLiteral(dynamic value, FieldSpec f, String className) {
 }
 
 String _toJsonExpr(String access, FieldSpec f) {
+  final isOpt = f.optional && !f.required;
   switch (f.type) {
     case FieldType.dateTime:
-      return f.optional && !f.required
+      return isOpt
           ? '$access?.toIso8601String()'
           : '$access.toIso8601String()';
     case FieldType.enum_:
-      return f.optional && !f.required ? '$access?.name' : '$access.name';
+      return isOpt ? '$access?.name' : '$access.name';
+    case FieldType.nestedType:
+      return isOpt ? '$access?.toJson()' : '$access.toJson()';
+    case FieldType.list:
+      // list[type[X]] needs deep toJson; list[String|dynamic|ref] passes through.
+      final inner = f.itemSpec;
+      if (inner?.nestedTypeRef != null) {
+        return isOpt
+            ? '$access?.map((e) => e.toJson()).toList()'
+            : '$access.map((e) => e.toJson()).toList()';
+      }
+      return access;
     default:
       return access;
   }
@@ -217,13 +409,18 @@ String _fromJsonExpr(String expr, FieldSpec f, String className) {
             ? '$src == null ? null : DateTime.parse($src as String)'
             : 'DateTime.parse($src as String)';
       case FieldType.enum_:
-        final enumName = _enumNameFor(className, f.name);
+        final enumName = f.enumRef ?? _enumNameFor(className, f.name);
         return isOpt
             ? '$src == null ? null : $enumName.values.byName($src as String)'
             : '$enumName.values.byName($src as String)';
       case FieldType.list:
-        // List<String> or List<dynamic>.
         final inner = f.itemSpec;
+        if (inner?.nestedTypeRef != null) {
+          final nested = inner!.nestedTypeRef!;
+          return isOpt
+              ? '($src as List?)?.map((e) => $nested.fromJson((e as Map).cast<String, dynamic>())).toList()'
+              : '($src as List).map((e) => $nested.fromJson((e as Map).cast<String, dynamic>())).toList()';
+        }
         if (inner != null &&
             (inner.type == FieldType.string || inner.type == FieldType.ref)) {
           return isOpt
@@ -237,6 +434,11 @@ String _fromJsonExpr(String expr, FieldSpec f, String className) {
         return isOpt
             ? '($src as Map?)?.cast<String, dynamic>()'
             : '($src as Map).cast<String, dynamic>()';
+      case FieldType.nestedType:
+        final nested = f.nestedTypeRef!;
+        return isOpt
+            ? '$src == null ? null : $nested.fromJson(($src as Map).cast<String, dynamic>())'
+            : '$nested.fromJson(($src as Map).cast<String, dynamic>())';
     }
   }
 
@@ -253,7 +455,8 @@ String _fromJsonExpr(String expr, FieldSpec f, String className) {
 }
 
 /// Multi-collection convenience — emits one model file per collection
-/// keyed by the suggested filename. Caller writes them to disk.
+/// AND per nested type, keyed by the suggested filename. Caller writes
+/// them to disk.
 Map<String, String> generateAllDartModels(
   Spec spec, {
   String? sourceFile,
@@ -262,6 +465,14 @@ Map<String, String> generateAllDartModels(
   for (final c in spec.collections.values) {
     final fileName = _fileNameFor(c.name);
     out[fileName] = generateDartModel(c, sourceFile: sourceFile);
+  }
+  for (final t in spec.types.values) {
+    final fileName = '${_nestedFileName(t.name)}.dart';
+    out[fileName] = generateNestedTypeModel(t, sourceFile: sourceFile);
+  }
+  final enumsFile = generateSharedEnumsFile(spec, sourceFile: sourceFile);
+  if (enumsFile != null) {
+    out['enums.dart'] = enumsFile;
   }
   return out;
 }

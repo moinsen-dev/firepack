@@ -1,16 +1,42 @@
 # firepack — bundled example.
 #
-# Tiny multi-tenant blog spec used as a smoke-test for the parser,
-# linter, indexes/rules generators, and the Mermaid visualizer. Also
-# demonstrates the M7 `storage:` block + `storageRef[<bucket>]` field
-# type for cross-system Firestore ↔ Storage relationships.
+# Multi-tenant blog spec used as a smoke-test for every feature:
+#   - collections, indexes, queries, rules
+#   - storage buckets + storageRef[X]
+#   - shared enums (enum[X])
+#   - nested types (type[X])
 #
-# This is *not* the WorkBrief spec — that one lives where it belongs,
-# in the WorkBrief repository at `app/firepack.yaml`. firepack the tool
-# stays domain-neutral.
+# This is *not* the WorkBrief spec — that one lives in the WorkBrief
+# repository at `app/firepack.yaml`. firepack stays domain-neutral.
 
 firepack: 1
 project: blog
+
+# --- Shared enums -------------------------------------------------------
+# Defined once, referenced from any field via `enum[<Name>]`. Use this
+# when the same enum is shared across collections / nested types. For
+# one-off enums, inline `type: enum, values: [..]` still works.
+
+enums:
+
+  PostStatus:
+    values: [draft, published, archived]
+
+  UserRole:
+    values: [admin, author, reader]
+
+# --- Nested types -------------------------------------------------------
+# Embedded value-objects stored as Maps inside their parent doc.
+# Referenced from fields via `type[<Name>]` or `list[type[<Name>]]`.
+
+types:
+
+  LinkPreview:
+    fields:
+      url:         { type: string, required: true }
+      title:       { type: string, required: true }
+      description: { type: string, optional: true }
+      imageUrl:    { type: string, optional: true }
 
 # --- Storage buckets ----------------------------------------------------
 # Logical Cloud-Storage path templates. Referenced from collection
@@ -46,10 +72,7 @@ collections:
       organizationId: { type: "ref[organizations.id]", required: true }
       displayName:    { type: string, required: true }
       email:          { type: string, required: true }
-      role:
-        type: enum
-        values: [admin, author, reader]
-        default: reader
+      role:           { type: "enum[UserRole]", default: reader }
 
   posts:
     tenant: organizationId
@@ -60,11 +83,9 @@ collections:
       title:          { type: string, required: true }
       body:           { type: string, required: true }
       coverImage:     { type: "storageRef[postCovers]", optional: true }
-      attachments:    { type: list, of: { type: "storageRef[attachments]" } }
-      status:
-        type: enum
-        values: [draft, published, archived]
-        default: draft
+      attachments:    { type: list, default: [], of: { type: "storageRef[attachments]" } }
+      linkPreview:    { type: "type[LinkPreview]", optional: true }
+      status:         { type: "enum[PostStatus]", default: draft }
       createdAt:      { type: dateTime, required: true, serverDefault: now }
       publishedAt:    { type: dateTime, optional: true }
 

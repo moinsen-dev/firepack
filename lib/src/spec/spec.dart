@@ -18,12 +18,35 @@ class Spec {
   /// the Mermaid graph.
   final Map<String, StorageBucket> storage;
 
+  /// Reusable nested types — Dart classes that are embedded as Maps
+  /// inside collection docs. Referenced from fields via `type[<name>]`
+  /// or `list[type[<name>]]` (`of:` mapping). One generated Dart file
+  /// per nested type.
+  final Map<String, NestedTypeSpec> types;
+
+  /// Shared enums — addressable via `enum[<EnumName>]` from any
+  /// collection or nested-type field. Use this when the same enum is
+  /// referenced from multiple classes (e.g. TaskType used by both
+  /// DraftTask and WorkBriefTask).
+  ///
+  /// Inline enums (`type: enum, values: [...]`) on a single field still
+  /// work and emit a per-class enum — use those for one-off enums.
+  final Map<String, EnumSpec> enums;
+
   const Spec({
     required this.version,
     required this.project,
     required this.collections,
     this.storage = const {},
+    this.types = const {},
+    this.enums = const {},
   });
+}
+
+class EnumSpec {
+  final String name;
+  final List<String> values;
+  const EnumSpec({required this.name, required this.values});
 }
 
 /// A logical Cloud-Storage path template. Not a generator-target by
@@ -50,6 +73,19 @@ class StorageBucket {
     this.tenant,
     this.contentTypes = const [],
   });
+}
+
+/// Reusable embedded type (nested Dart class, stored as Map<String, dynamic>
+/// inside a Firestore doc). Defined under top-level `types:` and
+/// referenced from collection/type fields via `type[<name>]`.
+///
+/// Distinct from a collection: nested types have NO Firestore path,
+/// NO doc-identity, NO rules — they are pure value objects living
+/// inside a parent doc.
+class NestedTypeSpec {
+  final String name;
+  final Map<String, FieldSpec> fields;
+  const NestedTypeSpec({required this.name, required this.fields});
 }
 
 class CollectionSpec {
@@ -99,6 +135,18 @@ class FieldSpec {
   /// zero new switch cases.
   final String? storageBucket;
 
+  /// Set when YAML type was `type[<nestedTypeName>]` (or list-of:
+  /// `list[type[<name>]]` via `of:`). Type is [FieldType.nestedType]
+  /// for the single case, or [FieldType.list] with itemSpec carrying
+  /// nestedTypeRef for the list case.
+  final String? nestedTypeRef;
+
+  /// Set when YAML type was `enum[<EnumName>]`. Type is
+  /// [FieldType.enum_] but instead of inlining values the field
+  /// references a top-level shared enum from `Spec.enums`. The
+  /// generated model imports the shared enum file and uses that name.
+  final String? enumRef;
+
   final bool required;
   final bool optional;
   final bool primaryKey;
@@ -114,6 +162,8 @@ class FieldSpec {
     this.refTarget,
     this.itemSpec,
     this.storageBucket,
+    this.nestedTypeRef,
+    this.enumRef,
     this.required = false,
     this.optional = false,
     this.primaryKey = false,
@@ -134,6 +184,7 @@ enum FieldType {
   ref,
   list,
   map,
+  nestedType,
 }
 
 enum ServerDefault { now, randomId }

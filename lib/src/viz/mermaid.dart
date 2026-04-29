@@ -42,6 +42,24 @@ String renderMermaid(Spec spec) {
     b.writeln('  }');
   }
 
+  // Nested types — embedded value-objects. Drawn as own entities so
+  // composition relationships from collection fields are visible.
+  for (final t in spec.types.values) {
+    b.writeln('  %% type:${t.name}');
+    b.writeln('  ${t.name} {');
+    for (final f in t.fields.values) {
+      final type = _mermaidType(f);
+      final flags = <String>[];
+      if (f.required) flags.add('required');
+      if (f.optional) flags.add('optional');
+      if (f.nestedTypeRef != null) flags.add('embeds');
+      if (f.itemSpec?.nestedTypeRef != null) flags.add('embeds[]');
+      final flagStr = flags.isEmpty ? '' : ' "${flags.join(",")}"';
+      b.writeln('    $type ${f.name}$flagStr');
+    }
+    b.writeln('  }');
+  }
+
   // Relationships — every ref / list[ref] yields one edge.
   for (final c in spec.collections.values) {
     for (final f in c.fields.values) {
@@ -64,8 +82,38 @@ String renderMermaid(Spec spec) {
           '  ${c.name} }o--|| $innerBucket : "${f.name}[]"',
         );
       }
+      // type[X] / list[type[X]] → composition edge from collection to nested type.
+      if (f.nestedTypeRef != null) {
+        b.writeln(
+          '  ${c.name} ||--|| ${f.nestedTypeRef} : "${f.name}"',
+        );
+      }
+      final innerType = f.itemSpec?.nestedTypeRef;
+      if (innerType != null) {
+        b.writeln(
+          '  ${c.name} }o--|| $innerType : "${f.name}[]"',
+        );
+      }
     }
   }
+
+  // Edges between nested types (e.g. WorkBriefTask embeds ChecklistItem).
+  for (final t in spec.types.values) {
+    for (final f in t.fields.values) {
+      if (f.nestedTypeRef != null) {
+        b.writeln(
+          '  ${t.name} ||--|| ${f.nestedTypeRef} : "${f.name}"',
+        );
+      }
+      final innerType = f.itemSpec?.nestedTypeRef;
+      if (innerType != null) {
+        b.writeln(
+          '  ${t.name} }o--|| $innerType : "${f.name}[]"',
+        );
+      }
+    }
+  }
+
   return b.toString();
 }
 
@@ -92,5 +140,7 @@ String _mermaidType(FieldSpec f) {
       return 'list';
     case FieldType.map:
       return 'map';
+    case FieldType.nestedType:
+      return 'type';
   }
 }

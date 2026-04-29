@@ -21,7 +21,9 @@ enum LintKind {
   conflictingFlags, // both `required: true` and `optional: true`
   orphanStorageRef, // storageRef[X] points at unknown storage bucket
   storageTenantNotInPath, // bucket.tenant set but `{tenant}` missing in path
-  nameCollision, // collection + storage bucket share a name
+  nameCollision, // collection + storage bucket + type share a name
+  orphanNestedTypeRef, // type[X] points at unknown nested-type
+  orphanEnumRef, // enum[X] points at unknown shared enum
 }
 
 /// Runs deterministic structural checks over a parsed [Spec]. Returns
@@ -31,15 +33,34 @@ List<LintIssue> lint(Spec spec) {
   final issues = <LintIssue>[];
   final knownCollections = spec.collections.keys.toSet();
   final knownBuckets = spec.storage.keys.toSet();
+  final knownTypes = spec.types.keys.toSet();
+  final knownEnums = spec.enums.keys.toSet();
 
-  // Storage-buckets must not collide with collection names — Mermaid
-  // entities share a single namespace, and so does any future codegen.
+  // Top-level entities (collections, storage buckets, nested types)
+  // share a single namespace — Mermaid entities and any future codegen
+  // would collide otherwise.
   for (final bucket in knownBuckets) {
     if (knownCollections.contains(bucket)) {
       issues.add(LintIssue(
         LintKind.nameCollision,
         bucket,
         'storage bucket name conflicts with collection of same name',
+      ));
+    }
+    if (knownTypes.contains(bucket)) {
+      issues.add(LintIssue(
+        LintKind.nameCollision,
+        bucket,
+        'storage bucket name conflicts with nested type of same name',
+      ));
+    }
+  }
+  for (final t in knownTypes) {
+    if (knownCollections.contains(t)) {
+      issues.add(LintIssue(
+        LintKind.nameCollision,
+        t,
+        'nested type name conflicts with collection of same name',
       ));
     }
   }
@@ -113,6 +134,8 @@ List<LintIssue> lint(Spec spec) {
           'storageRef points at unknown bucket "$innerBucket"',
         ));
       }
+      _checkNestedTypeRef(issues, '${c.name}.${f.name}', f, knownTypes);
+      _checkEnumRef(issues, '${c.name}.${f.name}', f, knownEnums);
     }
 
     // Duplicate index detection
@@ -131,5 +154,59 @@ List<LintIssue> lint(Spec spec) {
     }
   }
 
+  // Lint nested-type fields too — they can reference other nested
+  // types, storage buckets, or collection refs the same way.
+  for (final t in spec.types.values) {
+    for (final f in t.fields.values) {
+      if (f.required && f.optional) {
+        issues.add(LintIssue(
+          LintKind.conflictingFlags,
+          'type ${t.name}.${f.name}',
+          'cannot be both required and optional',
+        ));
+      }
+      _checkNestedTypeRef(issues, 'type ${t.name}.${f.name}', f, knownTypes);
+      _checkEnumRef(issues, 'type ${t.name}.${f.name}', f, knownEnums);
+    }
+  }
+
   return issues;
+}
+
+void _checkEnumRef(
+  List<LintIssue> issues,
+  String target,
+  FieldSpec f,
+  Set<String> knownEnums,
+) {
+  if (f.enumRef != null && !knownEnums.contains(f.enumRef)) {
+    issues.add(LintIssue(
+      LintKind.orphanEnumRef,
+      target,
+      'enum[...] points at unknown enum "${f.enumRef}"',
+    ));
+  }
+}
+
+void _checkNestedTypeRef(
+  List<LintIssue> issues,
+  String target,
+  FieldSpec f,
+  Set<String> knownTypes,
+) {
+  if (f.nestedTypeRef != null && !knownTypes.contains(f.nestedTypeRef)) {
+    issues.add(LintIssue(
+      LintKind.orphanNestedTypeRef,
+      target,
+      'type[...] points at unknown nested type "${f.nestedTypeRef}"',
+    ));
+  }
+  final innerType = f.itemSpec?.nestedTypeRef;
+  if (innerType != null && !knownTypes.contains(innerType)) {
+    issues.add(LintIssue(
+      LintKind.orphanNestedTypeRef,
+      '$target[]',
+      'type[...] points at unknown nested type "$innerType"',
+    ));
+  }
 }

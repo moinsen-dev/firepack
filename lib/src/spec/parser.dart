@@ -46,12 +46,70 @@ class FirepackParser {
       }
     }
 
+    final types = <String, NestedTypeSpec>{};
+    final typesNode = raw['types'];
+    if (typesNode is YamlMap) {
+      for (final entry in typesNode.entries) {
+        final typeName = entry.key.toString();
+        types[typeName] = _parseNestedType(typeName, entry.value);
+      }
+    }
+
+    final enums = <String, EnumSpec>{};
+    final enumsNode = raw['enums'];
+    if (enumsNode is YamlMap) {
+      for (final entry in enumsNode.entries) {
+        final enumName = entry.key.toString();
+        enums[enumName] = _parseEnumSpec(enumName, entry.value);
+      }
+    }
+
     return Spec(
       version: version,
       project: project,
       collections: collections,
       storage: storage,
+      types: types,
+      enums: enums,
     );
+  }
+
+  EnumSpec _parseEnumSpec(String name, dynamic node) {
+    if (node is! YamlMap) {
+      throw FormatException(
+        'firepack: enum "$name" must be a mapping with values:',
+      );
+    }
+    final v = node['values'];
+    if (v is! YamlList || v.isEmpty) {
+      throw FormatException(
+        'firepack: enum "$name" needs non-empty values:',
+      );
+    }
+    return EnumSpec(
+      name: name,
+      values: v.map((e) => e.toString()).toList(growable: false),
+    );
+  }
+
+  NestedTypeSpec _parseNestedType(String name, dynamic node) {
+    if (node is! YamlMap) {
+      throw FormatException(
+        'firepack: type "$name" must be a mapping',
+      );
+    }
+    final fieldsNode = node['fields'];
+    if (fieldsNode is! YamlMap) {
+      throw FormatException(
+        'firepack: type "$name" must define "fields:"',
+      );
+    }
+    final fields = <String, FieldSpec>{};
+    for (final entry in fieldsNode.entries) {
+      final fName = entry.key.toString();
+      fields[fName] = _parseField(fName, entry.value, owner: 'type $name');
+    }
+    return NestedTypeSpec(name: name, fields: fields);
   }
 
   StorageBucket _parseStorageBucket(String name, dynamic node) {
@@ -163,7 +221,8 @@ class FirepackParser {
     String? refTarget;
     FieldSpec? itemSpec;
 
-    if (type == FieldType.enum_) {
+    if (type == FieldType.enum_ && !typeStr.startsWith('enum[')) {
+      // Inline enum — must have values: [...] right here.
       final v = node['values'];
       if (v is! YamlList || v.isEmpty) {
         throw FormatException(
@@ -172,6 +231,8 @@ class FirepackParser {
       }
       enumValues = v.map((e) => e.toString()).toList(growable: false);
     }
+    // For shared enums (`enum[Name]`) values live in spec.enums and the
+    // generator looks them up — no inline values required.
 
     if (typeStr.startsWith('ref[') ||
         typeStr.startsWith('list[ref:') ||
@@ -193,6 +254,20 @@ class FirepackParser {
       storageBucket = typeStr.substring(start, end);
     }
 
+    String? nestedTypeRef;
+    if (typeStr.startsWith('type[')) {
+      final start = typeStr.indexOf('[') + 1;
+      final end = typeStr.lastIndexOf(']');
+      nestedTypeRef = typeStr.substring(start, end);
+    }
+
+    String? enumRef;
+    if (typeStr.startsWith('enum[')) {
+      final start = typeStr.indexOf('[') + 1;
+      final end = typeStr.lastIndexOf(']');
+      enumRef = typeStr.substring(start, end);
+    }
+
     if (type == FieldType.list) {
       // Inner type lives in node['of'] OR is encoded into the type string.
       final ofNode = node['of'];
@@ -208,6 +283,8 @@ class FirepackParser {
       refTarget: refTarget,
       itemSpec: itemSpec,
       storageBucket: storageBucket,
+      nestedTypeRef: nestedTypeRef,
+      enumRef: enumRef,
       required: _bool(node, 'required', def: false),
       optional: _bool(node, 'optional', def: false),
       primaryKey: _bool(node, 'primaryKey', def: false),
@@ -229,13 +306,17 @@ class FirepackParser {
     if (s == 'double' || s == 'number') return FieldType.double_;
     if (s == 'bool') return FieldType.bool_;
     if (s == 'dateTime' || s == 'datetime') return FieldType.dateTime;
-    if (s == 'enum') return FieldType.enum_;
+    if (s == 'enum' || s.startsWith('enum[')) return FieldType.enum_;
     if (s.startsWith('ref[')) return FieldType.ref;
     if (s.startsWith('list[') || s == 'list') return FieldType.list;
     if (s == 'map') return FieldType.map;
     // storageRef[<bucket>] — runtime type is string (the path); the
     // bucket marker lives separately on FieldSpec.storageBucket.
     if (s.startsWith('storageRef[')) return FieldType.string;
+    // type[<nestedTypeName>] — embedded nested class. Runtime type is
+    // the nested class itself (NOT a string), so this is a real new
+    // FieldType — not a string-with-marker like storageRef.
+    if (s.startsWith('type[')) return FieldType.nestedType;
     throw FormatException(
       'firepack: unknown type "$s" on "$owner.$field"',
     );

@@ -236,6 +236,14 @@ class _WatchCommand extends Command<int> {
                 : mermaid;
             File(t.out).writeAsStringSync(body);
             stdout.writeln('  ✓ viz → ${t.out}');
+          case 'storage':
+            final body = generateStoragePathsFile(spec, sourceFile: specPath);
+            if (body == null) {
+              stdout.writeln('  - storage skipped (no buckets in spec)');
+            } else {
+              File(t.out).writeAsStringSync(body);
+              stdout.writeln('  ✓ storage → ${t.out}');
+            }
           default:
             stderr.writeln('  ✗ unknown target "${t.target}" — skipped');
         }
@@ -287,6 +295,8 @@ class _WatchCommand extends Command<int> {
         return 'lib/firepack/models';
       case 'repos':
         return 'lib/firepack/repositories';
+      case 'storage':
+        return 'lib/firepack/storage_paths.dart';
       default:
         return target;
     }
@@ -367,7 +377,7 @@ class _DiffCommand extends Command<int> {
 }
 
 class _RegenCommand extends _SpecCommand {
-  static const _supportedTargets = {'indexes', 'rules', 'models', 'repos'};
+  static const _supportedTargets = {'indexes', 'rules', 'models', 'repos', 'storage'};
 
   _RegenCommand() {
     argParser
@@ -376,7 +386,7 @@ class _RegenCommand extends _SpecCommand {
         abbr: 't',
         help: 'What to regenerate. Today: indexes, rules, models. '
             'Future: repos, types.',
-        allowed: ['indexes', 'rules', 'models', 'repos', 'types'],
+        allowed: ['indexes', 'rules', 'models', 'repos', 'storage'],
         defaultsTo: 'indexes',
       )
       ..addOption(
@@ -460,6 +470,15 @@ class _RegenCommand extends _SpecCommand {
       case 'rules':
         content = generateRulesFile(spec);
         defaultOut = 'firestore.rules';
+      case 'storage':
+        final body = generateStoragePathsFile(spec);
+        if (body == null) {
+          stdout.writeln('firepack regen storage: '
+              'spec has no `storage:` block — nothing to generate.');
+          return 0;
+        }
+        content = body;
+        defaultOut = 'lib/firepack/storage_paths.dart';
       default:
         return 64;
     }
