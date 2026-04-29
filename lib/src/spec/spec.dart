@@ -11,10 +11,44 @@ class Spec {
   final String project;
   final Map<String, CollectionSpec> collections;
 
+  /// Top-level Cloud-Storage buckets / path templates, addressable via
+  /// `storageRef[<name>]` field types. Empty when the project has no
+  /// Storage usage. Doc-level: makes the "files live in Storage but
+  /// pointers live in Firestore"-relationship explicit + visible in
+  /// the Mermaid graph.
+  final Map<String, StorageBucket> storage;
+
   const Spec({
     required this.version,
     required this.project,
     required this.collections,
+    this.storage = const {},
+  });
+}
+
+/// A logical Cloud-Storage path template. Not a generator-target by
+/// itself in v1 (rules-generation lives in M7.5 if it gets painful) —
+/// the value today is referenced from `storageRef[<name>]` fields and
+/// rendered as a node + edge in `firepack viz`.
+class StorageBucket {
+  final String name;
+
+  /// Path template with `{var}` placeholders, e.g.
+  /// `evidence/{organizationId}/{workBriefId}/{evidenceId}`.
+  final String path;
+
+  /// Tenant variable inside the path template. When set, must match
+  /// one of the `{var}` placeholders in [path].
+  final String? tenant;
+
+  /// MIME-allowlist (empty = no restriction declared in the spec).
+  final List<String> contentTypes;
+
+  const StorageBucket({
+    required this.name,
+    required this.path,
+    this.tenant,
+    this.contentTypes = const [],
   });
 }
 
@@ -57,6 +91,14 @@ class FieldSpec {
   /// Only valid for `list[X]` types. Holds the element type spec.
   final FieldSpec? itemSpec;
 
+  /// Set when YAML type was `storageRef[<bucket-name>]`. The runtime
+  /// type is still [FieldType.string] (it stores a Storage path), but
+  /// this marker lets lint validate the reference and the viz draw an
+  /// edge to the bucket node. Reusing string-type means existing
+  /// codegens (model, repo) treat the field as a regular string with
+  /// zero new switch cases.
+  final String? storageBucket;
+
   final bool required;
   final bool optional;
   final bool primaryKey;
@@ -71,6 +113,7 @@ class FieldSpec {
     this.enumValues,
     this.refTarget,
     this.itemSpec,
+    this.storageBucket,
     this.required = false,
     this.optional = false,
     this.primaryKey = false,

@@ -1,24 +1,24 @@
-# firepack watch config — WorkBrief consumption.
+# firepack watch config — example for the bundled blog spec.
 #
 # Run from this directory:
-#   firepack watch --spec workbrief.firepack.yaml --config firepack.config.yaml
+#   firepack watch --spec blog.firepack.yaml --config firepack.config.yaml
 #
-# Each target maps a generator -> output path. `collection:` filters
-# multi-file generators (models, repos) to only those collections that
-# have actually been migrated to firepack on the WorkBrief side.
+# In real consumption, this file lives next to YOUR `firepack.yaml`
+# in YOUR repo (NOT inside firepack/example) — see for instance the
+# WorkBrief consumer at `~/work/moinsen/ideas/work_brief/app/firepack.config.yaml`.
 
 targets:
 
   indexes:
-    out: ../../../ideas/work_brief/app/firestore.indexes.json
+    out: /tmp/blog.indexes.json
 
   rules:
-    out: ../../../ideas/work_brief/app/firestore.rules
+    out: /tmp/blog.rules
 
   models:
-    out: ../../../ideas/work_brief/app/lib/firepack/models
-    collection: errorReports
+    out: /tmp/blog/models
+    collection: posts
 
   repos:
-    out: ../../../ideas/work_brief/app/lib/firepack/repositories
-    collection: errorReports
+    out: /tmp/blog/repos
+    collection: posts

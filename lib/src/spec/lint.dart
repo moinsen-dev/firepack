@@ -19,6 +19,9 @@ enum LintKind {
   missingTenantField, // `tenant: foo` set but no `foo` field
   noPrimaryKey, // collection has no `primaryKey: true` field
   conflictingFlags, // both `required: true` and `optional: true`
+  orphanStorageRef, // storageRef[X] points at unknown storage bucket
+  storageTenantNotInPath, // bucket.tenant set but `{tenant}` missing in path
+  nameCollision, // collection + storage bucket share a name
 }
 
 /// Runs deterministic structural checks over a parsed [Spec]. Returns
@@ -27,6 +30,29 @@ enum LintKind {
 List<LintIssue> lint(Spec spec) {
   final issues = <LintIssue>[];
   final knownCollections = spec.collections.keys.toSet();
+  final knownBuckets = spec.storage.keys.toSet();
+
+  // Storage-buckets must not collide with collection names — Mermaid
+  // entities share a single namespace, and so does any future codegen.
+  for (final bucket in knownBuckets) {
+    if (knownCollections.contains(bucket)) {
+      issues.add(LintIssue(
+        LintKind.nameCollision,
+        bucket,
+        'storage bucket name conflicts with collection of same name',
+      ));
+    }
+  }
+
+  for (final s in spec.storage.values) {
+    if (s.tenant != null && !s.path.contains('{${s.tenant}}')) {
+      issues.add(LintIssue(
+        LintKind.storageTenantNotInPath,
+        'storage.${s.name}',
+        'tenant: "${s.tenant}" but path does not contain "{${s.tenant}}"',
+      ));
+    }
+  }
 
   for (final c in spec.collections.values) {
     // Tenant field exists when declared
@@ -70,6 +96,22 @@ List<LintIssue> lint(Spec spec) {
             'ref points at unknown collection "$collection"',
           ));
         }
+      }
+      if (f.storageBucket != null &&
+          !knownBuckets.contains(f.storageBucket)) {
+        issues.add(LintIssue(
+          LintKind.orphanStorageRef,
+          '${c.name}.${f.name}',
+          'storageRef points at unknown bucket "${f.storageBucket}"',
+        ));
+      }
+      final innerBucket = f.itemSpec?.storageBucket;
+      if (innerBucket != null && !knownBuckets.contains(innerBucket)) {
+        issues.add(LintIssue(
+          LintKind.orphanStorageRef,
+          '${c.name}.${f.name}[]',
+          'storageRef points at unknown bucket "$innerBucket"',
+        ));
       }
     }
 

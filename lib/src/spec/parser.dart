@@ -37,10 +37,48 @@ class FirepackParser {
       collections[name] = _parseCollection(name, entry.value);
     }
 
+    final storage = <String, StorageBucket>{};
+    final storageNode = raw['storage'];
+    if (storageNode is YamlMap) {
+      for (final entry in storageNode.entries) {
+        final bucketName = entry.key.toString();
+        storage[bucketName] = _parseStorageBucket(bucketName, entry.value);
+      }
+    }
+
     return Spec(
       version: version,
       project: project,
       collections: collections,
+      storage: storage,
+    );
+  }
+
+  StorageBucket _parseStorageBucket(String name, dynamic node) {
+    if (node is! YamlMap) {
+      throw FormatException(
+        'firepack: storage bucket "$name" must be a mapping',
+      );
+    }
+    final path = node['path']?.toString();
+    if (path == null || path.isEmpty) {
+      throw FormatException(
+        'firepack: storage bucket "$name" needs "path:" template',
+      );
+    }
+    final tenant = node['tenant']?.toString();
+    final ctNode = node['contentTypes'];
+    final contentTypes = <String>[];
+    if (ctNode is YamlList) {
+      for (final ct in ctNode) {
+        contentTypes.add(ct.toString());
+      }
+    }
+    return StorageBucket(
+      name: name,
+      path: path,
+      tenant: tenant,
+      contentTypes: contentTypes,
     );
   }
 
@@ -148,6 +186,13 @@ class FirepackParser {
       }
     }
 
+    String? storageBucket;
+    if (typeStr.startsWith('storageRef[')) {
+      final start = typeStr.indexOf('[') + 1;
+      final end = typeStr.lastIndexOf(']');
+      storageBucket = typeStr.substring(start, end);
+    }
+
     if (type == FieldType.list) {
       // Inner type lives in node['of'] OR is encoded into the type string.
       final ofNode = node['of'];
@@ -162,6 +207,7 @@ class FirepackParser {
       enumValues: enumValues,
       refTarget: refTarget,
       itemSpec: itemSpec,
+      storageBucket: storageBucket,
       required: _bool(node, 'required', def: false),
       optional: _bool(node, 'optional', def: false),
       primaryKey: _bool(node, 'primaryKey', def: false),
@@ -187,6 +233,9 @@ class FirepackParser {
     if (s.startsWith('ref[')) return FieldType.ref;
     if (s.startsWith('list[') || s == 'list') return FieldType.list;
     if (s == 'map') return FieldType.map;
+    // storageRef[<bucket>] — runtime type is string (the path); the
+    // bucket marker lives separately on FieldSpec.storageBucket.
+    if (s.startsWith('storageRef[')) return FieldType.string;
     throw FormatException(
       'firepack: unknown type "$s" on "$owner.$field"',
     );

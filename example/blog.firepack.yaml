@@ -1,0 +1,96 @@
+# firepack — bundled example.
+#
+# Tiny multi-tenant blog spec used as a smoke-test for the parser,
+# linter, indexes/rules generators, and the Mermaid visualizer. Also
+# demonstrates the M7 `storage:` block + `storageRef[<bucket>]` field
+# type for cross-system Firestore ↔ Storage relationships.
+#
+# This is *not* the WorkBrief spec — that one lives where it belongs,
+# in the WorkBrief repository at `app/firepack.yaml`. firepack the tool
+# stays domain-neutral.
+
+firepack: 1
+project: blog
+
+# --- Storage buckets ----------------------------------------------------
+# Logical Cloud-Storage path templates. Referenced from collection
+# fields via `storageRef[<bucket>]` so the cross-system edge is
+# explicit in the data model.
+
+storage:
+
+  postCovers:
+    path: "covers/{organizationId}/{postId}.jpg"
+    tenant: organizationId
+    contentTypes: [image/jpeg, image/png]
+
+  attachments:
+    path: "attachments/{organizationId}/{postId}/{attachmentId}"
+    tenant: organizationId
+    contentTypes: [application/pdf, image/jpeg, image/png]
+
+# --- Collections --------------------------------------------------------
+
+collections:
+
+  organizations:
+    fields:
+      id:        { type: string, primaryKey: true }
+      name:      { type: string, required: true }
+      createdAt: { type: dateTime, required: true, serverDefault: now }
+
+  users:
+    tenant: organizationId
+    fields:
+      id:             { type: string, primaryKey: true }
+      organizationId: { type: "ref[organizations.id]", required: true }
+      displayName:    { type: string, required: true }
+      email:          { type: string, required: true }
+      role:
+        type: enum
+        values: [admin, author, reader]
+        default: reader
+
+  posts:
+    tenant: organizationId
+    fields:
+      id:             { type: string, primaryKey: true }
+      organizationId: { type: "ref[organizations.id]", required: true }
+      authorId:       { type: "ref[users.id]", required: true }
+      title:          { type: string, required: true }
+      body:           { type: string, required: true }
+      coverImage:     { type: "storageRef[postCovers]", optional: true }
+      attachments:    { type: list, of: { type: "storageRef[attachments]" } }
+      status:
+        type: enum
+        values: [draft, published, archived]
+        default: draft
+      createdAt:      { type: dateTime, required: true, serverDefault: now }
+      publishedAt:    { type: dateTime, optional: true }
+
+    indexes:
+      - fields: [organizationId, status, createdAt:desc]
+      - fields: [organizationId, authorId, createdAt:desc]
+
+    queries:
+      watchByOrg:
+        where: [tenant]
+        orderBy: createdAt:desc
+        limit: 50
+      watchByOrgAndStatus:
+        where: [tenant, "status == $status"]
+        orderBy: createdAt:desc
+      watchById:
+        byId: true
+
+  comments:
+    tenant: organizationId
+    fields:
+      id:             { type: string, primaryKey: true }
+      organizationId: { type: "ref[organizations.id]", required: true }
+      postId:         { type: "ref[posts.id]", required: true }
+      authorId:       { type: "ref[users.id]", required: true }
+      body:           { type: string, required: true }
+      createdAt:      { type: dateTime, required: true, serverDefault: now }
+    indexes:
+      - fields: [postId, createdAt:asc]

@@ -12,6 +12,75 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Cloud-Functions-Side-Konsumption.
 - Pub.dev-Release sobald Spec-Format extern stabil bleibt.
 
+## [0.0.9] — 2026-04-29
+
+### Added
+- **Storage als First-Class-Citizen in der Spec (M7).** Zwei
+  Erweiterungen die zusammenarbeiten:
+  - `storage:` top-level Block in `firepack.yaml`. Pro Bucket: `path`
+    (Template mit `{var}`-Platzhaltern), optionaler `tenant`,
+    optionale `contentTypes` MIME-Allowlist.
+  - `storageRef[<bucket>]` als Field-Type. Runtime-Type bleibt String
+    (es ist ein Storage-Pfad), aber das Spec-Modell trägt einen
+    `storageBucket`-Marker, den Lint + Viz auswerten. Auch in
+    `list[storageRef[X]]` (über `of:` mapping).
+- Drei neue Lint-Regeln:
+  - `orphanStorageRef` — Field zeigt auf nicht existierenden Bucket.
+  - `storageTenantNotInPath` — Bucket-Tenant ohne `{tenant}` im Path-
+    Template.
+  - `nameCollision` — Bucket + Collection teilen sich einen Namen
+    (Mermaid-Entity-Namespace ist global).
+- Mermaid-Viz: Storage-Buckets als eigene Nodes (mit `path` +
+  `contentTypes` als Pseudo-Felder), Edges von Collection-Fields zum
+  Bucket-Node. Cross-System-Beziehung damit visuell sichtbar.
+- `firepack viz --out <path.md>` wrappt Output jetzt in einen
+  Mermaid-Code-Fence — das `.md` rendert direkt auf GitHub.
+- Watch-Target `viz` in `firepack.config.yaml`. Architektur-Diagramm
+  bleibt automatisch aktuell bei jedem Spec-Save.
+
+### Changed (Spec-Heimat)
+- **Die WorkBrief-Spec lebt nicht mehr in firepack.** Sie ist die
+  Source-of-Truth für WorkBrief und gehört dorthin: jetzt
+  `~/work/moinsen/ideas/work_brief/app/firepack.yaml`. firepack
+  bleibt domain-neutral — `example/` enthält stattdessen ein
+  generisches Mini-Spec (`blog.firepack.yaml`) das alle Features
+  inkl. M7 demonstriert.
+- Test-Fixture `test/fixtures/blog.indexes.expected.json` ersetzt
+  die bisherige WorkBrief-Snapshot-Fixture.
+- 5 neue Tests, 34/34 grün.
+
+### Why this matters
+M7 schließt die "Architektur-Doku"-Lücke: Heute lebt Wissen über
+Firestore↔Storage-Beziehungen verteilt in Code (Upload-Pfade in
+Flutter, Read-Pfade in Functions, Tenant-Checks in `storage.rules`)
+und in Köpfen. Mit der Spec als Single-Source haben alle Konsumenten
+denselben Graph — und der Viz macht ihn Reviewbar.
+
+### Reflexion (Plan vs. Realität)
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Spec-Erweiterung + Parser + Lint + Viz + Tests | 30 min | ~14 min | ~2× |
+| Spec-Umzug nach WorkBrief + generisches Beispiel | 15 min | ~10 min | ~1.5× |
+| WorkBrief-Konsumption (`storage:` + storageRef + viz target) | 10 min | ~5 min | ~2× |
+| Viz-md-wrap + viz-watch-target (Bonus, ungeplant) | — | ~5 min | n/a |
+| **Gesamt M7** | **55 min** | **~34 min** | **~1.6×** |
+
+Lessons:
+- **Option B (Marker statt FieldType-Enum-Eintrag) war richtig.**
+  Hätte ich `FieldType.storageRef` hinzugefügt, hätte ich vier
+  Generators (model, repo, viz, diff) plus drei Tests anpassen
+  müssen — Switch-Exhaustiveness in Dart. Stattdessen ein neuer
+  String-Marker auf `FieldSpec`, alle bestehenden Generators sehen
+  weiter ein normales String-Field. Null Switch-Brüche.
+- **Spec-Heimat war überfällig.** Solange WorkBrief-Spec im firepack-
+  Repo lebte, mischten sich Tool-Code + Konsumenten-Daten. Sauberer
+  Cut: firepack ist domain-neutral, jeder Konsument hat seine eigene
+  Spec. Neue Konsumenten kommen ohne Reibung dazu.
+- **Visualisierung als Treiber, nicht Codegen.** Der eigentliche
+  Bringer von M7 ist die Architektur-Doku — Storage-Rules-Generator
+  bleibt bewusst aus, niemand braucht ihn heute. Bootstrap-Disziplin
+  hält.
+
 ## [0.0.8] — 2026-04-27
 
 ### Added

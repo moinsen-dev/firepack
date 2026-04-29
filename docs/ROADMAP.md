@@ -6,6 +6,53 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 
 ## Done
 
+### v0.0.9 — M7 Storage in Spec + Viz (2026-04-29, ~34 min)
+
+- Spec-Erweiterung: `storage:`-Block + `storageRef[<bucket>]`-Field-
+  Type (auch innerhalb `list[storageRef[X]]`).
+- Drei neue Lint-Regeln: `orphanStorageRef`,
+  `storageTenantNotInPath`, `nameCollision` (Bucket vs. Collection).
+- Mermaid-Viz: Storage-Buckets als eigene Nodes mit `path` +
+  `contentTypes` Pseudo-Feldern, Edges von Doc-Fields zum Bucket.
+  Cross-System-Beziehung Firestore ↔ Storage damit visuell sichtbar.
+- `firepack viz --out <file.md>` wrappt Output in `mermaid`-Code-
+  Fence → `.md` rendert direkt auf GitHub.
+- Watch-Target `viz` — Architektur-Diagramm bleibt bei jedem
+  Spec-Save aktuell.
+
+**Spec-Heimat verlegt:** Die WorkBrief-Spec lebt jetzt da, wo sie
+hingehört — `~/work/moinsen/ideas/work_brief/app/firepack.yaml`.
+firepack bleibt domain-neutral; `example/blog.firepack.yaml` ist
+das generische Mini-Beispiel.
+
+**WorkBrief-Konsumption:**
+- `app/firepack.yaml` — Spec mit `storage:`-Block (zwei Buckets:
+  `sourceMaterialFiles`, `evidenceFiles`).
+- `app/firepack.config.yaml` — 5 Watch-Targets (indexes, rules,
+  models[errorReports], repos[errorReports], viz).
+- `app/firepack.architecture.md` — gerenderter Mermaid-Graph mit
+  13 Collections + 2 Storage-Buckets + Cross-System-Edges.
+
+#### Reflexion
+
+| Phase | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| Spec + Parser + Lint + Viz + Tests | 30 min | ~14 min | ~2× |
+| Spec-Umzug + generisches Beispiel | 15 min | ~10 min | ~1.5× |
+| WorkBrief-Konsumption | 10 min | ~5 min | ~2× |
+| Viz-md-wrap + viz-watch-target (Bonus) | — | ~5 min | n/a |
+| **Gesamt M7** | **55 min** | **~34 min** | **~1.6×** |
+
+Lessons:
+- **Option B (Marker statt FieldType-Enum-Eintrag) war richtig.**
+  String-Type + neuer `storageBucket`-Marker — alle Generators sehen
+  weiter ein normales String-Field, null Switch-Brüche.
+- **Visualisierung war der Treiber, nicht Codegen.** M7 löst das
+  Architektur-Doku-Problem, nicht ein neues Generator-Problem.
+  Storage-Rules-Generator bleibt bewusst draußen — kein Schmerz.
+- **Spec-Heimat war überfällig.** firepack-Tool und WorkBrief-Daten
+  in einem Repo war Bootstrap-Erbe. Saubere Trennung jetzt.
+
 ### v0.0.8 — M6 Watch-Mode (2026-04-27, ~14 min)
 
 - `firepack watch [--spec <path>] [--config <path>]` CLI: erstes

@@ -86,15 +86,16 @@ diff in `firepack.yaml`.
 
 ## Status
 
-**Today (v0.0.8):**
+**Today (v0.0.9):**
 - ✅ YAML spec parser + lint
-- ✅ Mermaid `firepack viz` output
+- ✅ Mermaid `firepack viz` output (`.md` auto-wraps in code fence)
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
 - ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
 - ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
 - ✅ Repository + Riverpod provider codegen (typed queries from spec)
 - ✅ `firepack diff` (PR-comment-shape semantic diff)
 - ✅ `firepack watch` (auto-regen on save, multi-target via config)
+- ✅ Storage refs in spec (`storage:` block + `storageRef[X]` fields)
 - ☐ TypeScript-types generator
 - ☐ Pub.dev release
 
@@ -105,10 +106,15 @@ diff in `firepack.yaml`.
 - ✅ `lib/firepack/repositories/error_report_repository.dart` —
   generated since v0.0.6, drives the /admin/errors dashboard
 
-## Eat-your-own-dogfood reference
+## Examples
 
-`example/workbrief.firepack.yaml` is the live data-model spec for
-WorkBrief, regenerated and diffed against the production schema.
+`example/blog.firepack.yaml` is a small generic spec that exercises
+every feature (collections, indexes, queries, rules, storage refs).
+Use it as a starting point or to sanity-check the toolchain.
+
+The real-world driver is **WorkBrief** — its spec lives in the
+WorkBrief repo at `app/firepack.yaml`, not in this repository.
+firepack stays domain-neutral; consumers own their own specs.
 
 ## License
 

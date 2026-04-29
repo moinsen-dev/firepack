@@ -23,8 +23,21 @@ String renderMermaid(Spec spec) {
       if (f.optional) flags.add('optional');
       if (f.immutable) flags.add('immutable');
       if (f.refTarget != null) flags.add('FK');
+      if (f.storageBucket != null) flags.add('storage');
       final flagStr = flags.isEmpty ? '' : ' "${flags.join(',')}"';
       b.writeln('    $type ${f.name}$flagStr');
+    }
+    b.writeln('  }');
+  }
+
+  // Storage-buckets — rendered as their own nodes so the cross-system
+  // edge from a Firestore field to a Storage path is visible.
+  for (final s in spec.storage.values) {
+    b.writeln('  %% storage:${s.name}${s.tenant != null ? ' [tenant=${s.tenant}]' : ''}');
+    b.writeln('  ${s.name} {');
+    b.writeln('    string path "${_escape(s.path)}"');
+    if (s.contentTypes.isNotEmpty) {
+      b.writeln('    string contentTypes "${_escape(s.contentTypes.join(","))}"');
     }
     b.writeln('  }');
   }
@@ -39,10 +52,25 @@ String renderMermaid(Spec spec) {
           '  ${c.name} $cardinality $target : "${f.name}"',
         );
       }
+      if (f.storageBucket != null) {
+        b.writeln(
+          '  ${c.name} }o--|| ${f.storageBucket} : "${f.name}"',
+        );
+      }
+      // list[storageRef[X]] → edge from collection to bucket too.
+      final innerBucket = f.itemSpec?.storageBucket;
+      if (innerBucket != null) {
+        b.writeln(
+          '  ${c.name} }o--|| $innerBucket : "${f.name}[]"',
+        );
+      }
     }
   }
   return b.toString();
 }
+
+String _escape(String s) =>
+    s.replaceAll('"', "'").replaceAll('\n', ' ');
 
 String _mermaidType(FieldSpec f) {
   switch (f.type) {
