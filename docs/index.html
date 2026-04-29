@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>firepack — One YAML spec, your entire Firestore data layer</title>
+  <meta name="description" content="Spec-driven Firestore + Flutter codegen. One YAML file → typed Dart models, Riverpod providers, repositories, security rules, indexes, and a Mermaid graph. Deterministic, regenerated on every save." />
+
+  <meta property="og:title" content="firepack — Spec-driven Firestore + Flutter codegen" />
+  <meta property="og:description" content="One YAML spec → typed Dart models, Riverpod providers, repositories, security rules, indexes, and a Mermaid graph." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://moinsen-dev.github.io/firepack/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular'],
+          },
+          colors: {
+            fire: {
+              50:  '#fff7ed',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+            },
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'gradient-x': 'gradient-x 8s ease infinite',
+          },
+          keyframes: {
+            'gradient-x': {
+              '0%, 100%': { 'background-position': '0% 50%' },
+              '50%':      { 'background-position': '100% 50%' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/dart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/bash.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .gradient-text {
+      background: linear-gradient(120deg, #fb923c 0%, #f97316 35%, #ec4899 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-size: 200% 200%;
+      animation: gradient-x 8s ease infinite;
+    }
+    .gradient-bg {
+      background: radial-gradient(circle at 20% 0%, rgba(249, 115, 22, 0.15), transparent 50%),
+                  radial-gradient(circle at 80% 100%, rgba(236, 72, 153, 0.15), transparent 50%),
+                  #0a0a0a;
+    }
+    pre code.hljs {
+      background: transparent !important;
+      padding: 0 !important;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+    .tab-active {
+      background-color: rgba(249, 115, 22, 0.15);
+      color: #fb923c;
+      border-color: rgba(249, 115, 22, 0.4);
+    }
+    .glow {
+      box-shadow: 0 0 60px -10px rgba(249, 115, 22, 0.4);
+    }
+  </style>
+</head>
+
+<body class="bg-[#0a0a0a] text-gray-200 antialiased">
+
+  <!-- ────────────────────────────────────────────  NAV  ──── -->
+  <nav class="sticky top-0 z-50 backdrop-blur-md bg-[#0a0a0a]/80 border-b border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2 font-bold text-lg">
+        <span class="text-2xl">🔥</span>
+        <span>firepack</span>
+        <span class="ml-2 text-xs px-2 py-0.5 bg-fire-500/15 text-fire-500 rounded-full font-medium">v0.0.15</span>
+      </a>
+      <div class="flex items-center gap-2 sm:gap-6 text-sm font-medium">
+        <a href="#what-it-does" class="hidden sm:inline text-gray-400 hover:text-white transition">Features</a>
+        <a href="#install" class="hidden sm:inline text-gray-400 hover:text-white transition">Install</a>
+        <a href="https://github.com/moinsen-dev/firepack" class="hidden sm:inline text-gray-400 hover:text-white transition">README</a>
+        <a href="https://github.com/moinsen-dev/firepack" class="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.07 3.29 9.38 7.86 10.9.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39.98 0 1.96.13 2.88.39 2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.41-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56 4.57-1.52 7.85-5.83 7.85-10.9C23.5 5.65 18.35.5 12 .5z"/></svg>
+          <span class="hidden sm:inline">Star on GitHub</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ────────────────────────────────────────────  HERO  ──── -->
+  <section class="gradient-bg overflow-hidden">
+    <div class="max-w-6xl mx-auto px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
+
+      <div class="text-center max-w-4xl mx-auto">
+        <span class="inline-block px-3 py-1 mb-6 text-xs font-medium tracking-wide uppercase text-fire-500 bg-fire-500/10 border border-fire-500/20 rounded-full">
+          🔥 Pre-pub release · v0.0.15 · 62 tests passing
+        </span>
+
+        <h1 class="text-5xl sm:text-7xl font-extrabold tracking-tight leading-[1.05] text-white mb-6">
+          One YAML spec.<br/>
+          <span class="gradient-text">Your entire Firestore data layer.</span>
+        </h1>
+
+        <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-10">
+          Stop hand-writing the 9-file fan-out for every new field. firepack
+          generates typed Dart models, Riverpod providers, repositories, security
+          rules, indexes, storage paths, and a Mermaid graph — deterministically,
+          on every save.
+        </p>
+
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <a href="#install"
+             class="px-6 py-3 bg-fire-500 hover:bg-fire-600 text-white font-semibold rounded-lg shadow-lg shadow-fire-500/30 transition">
+            Get started →
+          </a>
+          <a href="https://github.com/moinsen-dev/firepack"
+             class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-semibold border border-white/10 rounded-lg transition flex items-center gap-2">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.07 3.29 9.38 7.86 10.9.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39.98 0 1.96.13 2.88.39 2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.41-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56 4.57-1.52 7.85-5.83 7.85-10.9C23.5 5.65 18.35.5 12 .5z"/></svg>
+            Star on GitHub
+          </a>
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-500">
+          <span>🚀 Pure Dart CLI · no build_runner</span>
+          <span>·</span>
+          <span>🎯 Deterministic output</span>
+          <span>·</span>
+          <span>👀 Watch mode</span>
+          <span>·</span>
+          <span>🧪 Snapshot-tested generators</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  DEMO  ──── -->
+  <section class="bg-gradient-to-b from-[#0a0a0a] via-[#0c0c0d] to-[#0a0a0a]">
+    <div class="max-w-6xl mx-auto px-6 py-20 sm:py-28">
+
+      <div class="text-center mb-12">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+          Write the spec. Get the data layer.
+        </h2>
+        <p class="text-gray-400 max-w-2xl mx-auto">
+          One <code class="text-fire-500 bg-fire-500/10 px-1.5 py-0.5 rounded text-sm">firepack.yaml</code>
+          declares your collections, fields, indexes, queries, and rules.
+          Click any tab to see what gets generated.
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-6">
+
+        <!-- LEFT: spec -->
+        <div class="rounded-xl bg-[#1c1c1e] border border-white/5 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2.5 bg-black/30 border-b border-white/5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+              <span class="ml-3 text-xs text-gray-400 font-mono">firepack.yaml</span>
+            </div>
+            <span class="text-xs text-gray-500">input</span>
+          </div>
+          <pre class="p-5 text-sm overflow-x-auto"><code class="language-yaml">firepack: 1
+project: blog
+collections:
+  posts:
+    tenant: organizationId
+    fields:
+      id:             { type: string, primaryKey: true }
+      title:          { type: string, required: true }
+      status:         { type: "enum[PostStatus]", default: draft }
+      createdAt:      { type: dateTime, required: true,
+                        serverDefault: now }
+      organizationId: { type: "ref[organizations.id]",
+                        required: true }
+    indexes:
+      - fields: [organizationId, status, createdAt:desc]
+    queries:
+      watchByOrg:
+        where: [tenant]
+        orderBy: createdAt:desc
+        limit: 50</code></pre>
+        </div>
+
+        <!-- RIGHT: generated tabs -->
+        <div class="rounded-xl bg-[#1c1c1e] border border-white/5 overflow-hidden flex flex-col">
+          <div class="flex items-center justify-between px-4 py-2.5 bg-black/30 border-b border-white/5">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+              <span class="ml-3 text-xs text-gray-400 font-mono">generated</span>
+            </div>
+            <span class="text-xs text-gray-500">output</span>
+          </div>
+          <div class="flex flex-wrap gap-1 px-3 pt-3 border-b border-white/5">
+            <button data-tab="model"      class="tab-btn tab-active text-xs font-medium px-3 py-1.5 rounded-t-md border-b-2 border-transparent hover:bg-white/5 transition">post.dart</button>
+            <button data-tab="repo"       class="tab-btn text-gray-500 text-xs font-medium px-3 py-1.5 rounded-t-md border-b-2 border-transparent hover:bg-white/5 transition">post_repository.dart</button>
+            <button data-tab="rules"      class="tab-btn text-gray-500 text-xs font-medium px-3 py-1.5 rounded-t-md border-b-2 border-transparent hover:bg-white/5 transition">firestore.rules</button>
+            <button data-tab="indexes"    class="tab-btn text-gray-500 text-xs font-medium px-3 py-1.5 rounded-t-md border-b-2 border-transparent hover:bg-white/5 transition">indexes.json</button>
+          </div>
+
+          <div class="flex-1 overflow-x-auto">
+            <pre data-tab-content="model" class="p-5 text-sm"><code class="language-dart">// GENERATED by firepack — do not edit.
+
+import 'enums.dart';
+
+class Post {
+  final String id;
+  final String organizationId;
+  final String title;
+  final PostStatus status;
+  final DateTime createdAt;
+
+  const Post({
+    required this.id,
+    required this.organizationId,
+    required this.title,
+    this.status = PostStatus.draft,
+    required this.createdAt,
+  });
+
+  Post copyWith({String? id, String? title, PostStatus? status, ...}) =>
+      Post(id: id ?? this.id, ...);
+
+  // Pure JSON — for REST APIs, hashing, snapshot tests.
+  Map&lt;String, dynamic&gt; toJson() => {
+    'id': id, 'title': title, 'status': status.toJson(),
+    'createdAt': createdAt.toIso8601String(), ...
+  };
+  factory Post.fromJson(Map&lt;String, dynamic&gt; json) => ...;
+
+  // Firestore-native — DateTime stays DateTime,
+  // cloud_firestore writes Timestamp.
+  Map&lt;String, dynamic&gt; toFirestore() => {
+    'id': id, 'title': title, 'status': status.toJson(),
+    'createdAt': createdAt, ...
+  };
+  factory Post.fromFirestore(Map&lt;String, dynamic&gt; data) => Post(
+    createdAt: _toDateTime(data['createdAt']),  // duck-typed
+    ...
+  );
+
+  @override bool operator ==(Object other) => ... // value equality
+  @override int get hashCode => Object.hash(...);
+}</code></pre>
+
+            <pre data-tab-content="repo" class="hidden p-5 text-sm"><code class="language-dart">// GENERATED by firepack — do not edit.
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../firestore_provider.dart';
+import '../paths.dart';
+import '../tenant_query.dart';
+import '../models/post.dart';
+
+class PostRepository {
+  final FirebaseFirestore _firestore;
+  PostRepository(this._firestore);
+
+  Stream&lt;List&lt;Post&gt;&gt; watchByOrg(String orgId) =>
+      _firestore.collection(FirestorePaths.posts)
+          .scopedToOrg(orgId)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .snapshots()
+          .map((s) => s.docs.map(_fromDoc).toList());
+
+  /// `merge: true` preserves server-only fields the model doesn't carry.
+  /// `serverDefault: now` injects FieldValue.serverTimestamp() (only on full set).
+  Future&lt;void&gt; add(Post doc, {bool merge = false}) {
+    final data = doc.toFirestore();
+    if (!merge) data['createdAt'] = FieldValue.serverTimestamp();
+    return _firestore.collection(FirestorePaths.posts)
+        .doc(doc.id).set(data, SetOptions(merge: merge));
+  }
+
+  Future&lt;void&gt; updateById(String id, Map&lt;String, dynamic&gt; fields) =>
+      _firestore.collection(FirestorePaths.posts).doc(id).update(fields);
+
+  Future&lt;void&gt; deleteById(String id) =>
+      _firestore.collection(FirestorePaths.posts).doc(id).delete();
+}
+
+// Single DI seam — override firestoreProvider once, every repo follows.
+final postRepositoryProvider = Provider&lt;PostRepository&gt;(
+  (ref) => PostRepository(ref.watch(firestoreProvider)),
+);
+
+final postWatchByOrgProvider = StreamProvider.family&lt;List&lt;Post&gt;, String&gt;(
+  (ref, orgId) => ref.watch(postRepositoryProvider).watchByOrg(orgId),
+);</code></pre>
+
+            <pre data-tab-content="rules" class="hidden p-5 text-sm"><code class="language-javascript">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reusable helpers — emitted from the spec, one read per request.
+    function isSignedIn()         { return request.auth != null; }
+    function userDoc()            { return get(/databases/$(database)
+                                      /documents/users/$(request.auth.uid)).data; }
+    function getUserOrgId()       { return userDoc().organizationId; }
+    function isAdmin()            { return userDoc().role == 'admin'; }
+    function isSupervisorOrAdmin() {
+      let role = userDoc().role;
+      return role == 'admin' || role == 'supervisor';
+    }
+
+    match /posts/{id} {
+      allow read:   if isSignedIn() &amp;&amp;
+                       (resource.data.organizationId == getUserOrgId() || isAdmin());
+      allow create: if isSignedIn() &amp;&amp; isSupervisorOrAdmin();
+      allow update: if isSupervisorOrAdmin();
+      allow delete: if false;
+    }
+
+    // Secure everything else by default
+    match /{document=**} { allow read, write: if false; }
+  }
+}</code></pre>
+
+            <pre data-tab-content="indexes" class="hidden p-5 text-sm"><code class="language-json">{
+  "indexes": [
+    {
+      "collectionGroup": "posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "status",         "order": "ASCENDING" },
+        { "fieldPath": "createdAt",      "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-center text-sm text-gray-500 mt-6">
+        And also: <code class="text-fire-500/80 font-mono text-xs">paths.dart</code> ·
+        <code class="text-fire-500/80 font-mono text-xs">firestore_provider.dart</code> ·
+        <code class="text-fire-500/80 font-mono text-xs">storage_paths.dart</code> ·
+        <code class="text-fire-500/80 font-mono text-xs">DATA_MODEL.md</code>
+        — see the
+        <a href="https://github.com/moinsen-dev/firepack#-what-firepack-generates" class="text-fire-500 hover:underline">full feature grid</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  FEATURES  ──── -->
+  <section id="what-it-does" class="bg-[#0a0a0a]">
+    <div class="max-w-6xl mx-auto px-6 py-20 sm:py-28">
+
+      <div class="text-center mb-14">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+          Nine targets, one source of truth.
+        </h2>
+        <p class="text-gray-400 max-w-2xl mx-auto">
+          Every output is deterministic — two runs on the same spec produce
+          byte-identical files. Snapshot tests catch any drift.
+        </p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🧱</div>
+          <h3 class="font-semibold text-white mb-2">Dart models</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            Immutable, value-equal, <code class="font-mono text-xs">copyWith</code>,
+            both pure-JSON and Firestore-native (de)serialisation.
+            Handles <code class="font-mono text-xs">Timestamp ⇄ DateTime</code>
+            via duck-typing — models stay framework-agnostic.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🔌</div>
+          <h3 class="font-semibold text-white mb-2">Repositories</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            Typed <code class="font-mono text-xs">Stream&lt;List&lt;X&gt;&gt;</code>
+            per spec query. <code class="font-mono text-xs">add(merge:)</code>,
+            <code class="font-mono text-xs">updateById</code>,
+            <code class="font-mono text-xs">deleteById</code>,
+            <code class="font-mono text-xs">watchById</code>.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🎯</div>
+          <h3 class="font-semibold text-white mb-2">Riverpod providers</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            <code class="font-mono text-xs">StreamProvider.family</code> per
+            query. Single <code class="font-mono text-xs">firestoreProvider</code>
+            DI seam — override once, every repo follows.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🛡️</div>
+          <h3 class="font-semibold text-white mb-2">Security rules</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            Per-collection read/create/update/delete with reusable helpers
+            (<code class="font-mono text-xs">isSignedIn</code>,
+            <code class="font-mono text-xs">tenantSelf</code>, …).
+            Deny-all default for unmatched paths.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🗂️</div>
+          <h3 class="font-semibold text-white mb-2">Composite indexes</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            <code class="font-mono text-xs">firestore.indexes.json</code> sorted,
+            deterministic, dedup'd. Diffs cleanly in PRs — no more "but it
+            worked locally" because the deploy missed an index.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">📁</div>
+          <h3 class="font-semibold text-white mb-2">Storage paths</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            Typed methods per declared bucket. Drift between upload code,
+            read code, and rules becomes a compile error, not a 3am page.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🌐</div>
+          <h3 class="font-semibold text-white mb-2">Mermaid graph</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            ER diagram with FKs, nested types, storage cross-system edges.
+            Renders inline on GitHub — your data architecture stays
+            documented automatically.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">🔍</div>
+          <h3 class="font-semibold text-white mb-2">Spec diff</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            <code class="font-mono text-xs">firepack diff --old --new</code>
+            renders a Markdown report — added / removed / changed
+            collections, fields, indexes. Drop-in for PR comments.
+          </p>
+        </div>
+
+        <div class="p-6 bg-white/[0.02] border border-white/5 rounded-xl hover:border-fire-500/30 transition">
+          <div class="text-2xl mb-3">👀</div>
+          <h3 class="font-semibold text-white mb-2">Watch mode</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            <code class="font-mono text-xs">firepack watch</code> regenerates
+            every configured target on every spec save. Pure Dart watcher —
+            no <code class="font-mono text-xs">build_runner</code>, no codegen
+            DAG, no part-files.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  HOW IT WORKS  ──── -->
+  <section class="bg-gradient-to-b from-[#0a0a0a] via-[#0c0c0d] to-[#0a0a0a]">
+    <div class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
+
+      <div class="text-center mb-14">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+          The loop is the feature.
+        </h2>
+        <p class="text-gray-400 max-w-2xl mx-auto">
+          firepack stays out of your way. No <code class="text-fire-500 bg-fire-500/10 px-1.5 py-0.5 rounded text-sm">build_runner</code>,
+          no part-files, no codegen DAG. One spec, one watcher, one
+          regenerated tree.
+        </p>
+      </div>
+
+      <div class="grid sm:grid-cols-4 gap-6">
+        <div class="text-center">
+          <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-fire-500 font-bold text-lg">1</div>
+          <h3 class="font-semibold text-white mb-2">Edit spec</h3>
+          <p class="text-xs text-gray-500 leading-relaxed">Add a field to <code class="font-mono text-xs">firepack.yaml</code>.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-fire-500 font-bold text-lg">2</div>
+          <h3 class="font-semibold text-white mb-2">Save</h3>
+          <p class="text-xs text-gray-500 leading-relaxed"><code class="font-mono text-xs">firepack watch</code> notices instantly.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-fire-500 font-bold text-lg">3</div>
+          <h3 class="font-semibold text-white mb-2">Regenerate</h3>
+          <p class="text-xs text-gray-500 leading-relaxed">Models, repos, rules, indexes — all rewritten.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-fire-500 font-bold text-lg">4</div>
+          <h3 class="font-semibold text-white mb-2">App reloads</h3>
+          <p class="text-xs text-gray-500 leading-relaxed">Flutter hot-reloads against the new shape. Done.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  INSTALL  ──── -->
+  <section id="install" class="bg-[#0a0a0a]">
+    <div class="max-w-4xl mx-auto px-6 py-20 sm:py-28">
+
+      <div class="text-center mb-12">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+          Install in 30 seconds.
+        </h2>
+        <p class="text-gray-400">Pre-pub-dev — install from a local clone.</p>
+      </div>
+
+      <div class="rounded-xl bg-[#1c1c1e] border border-white/5 overflow-hidden glow">
+        <div class="flex items-center gap-2 px-4 py-2.5 bg-black/30 border-b border-white/5">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+          <span class="ml-3 text-xs text-gray-400 font-mono">terminal</span>
+        </div>
+        <pre class="p-6 text-sm overflow-x-auto"><code class="language-bash"># Clone + install (path-source, picks up git pull automatically)
+git clone https://github.com/moinsen-dev/firepack &amp;&amp; cd firepack
+dart pub global activate --source path .
+export PATH="$PATH:$HOME/.pub-cache/bin"   # add to ~/.zshrc
+
+# Try the bundled example app
+just example-regen          # regenerate the whole data layer
+just example-emulator-up    # boot Firebase Emulator (other terminal)
+just example-run            # run Flutter app against the emulator</code></pre>
+      </div>
+
+      <p class="text-center text-sm text-gray-500 mt-6">
+        Need details? The
+        <a href="https://github.com/moinsen-dev/firepack#-quick-start" class="text-fire-500 hover:underline">full quick-start</a>
+        in the README walks through the example app's CRUD demo end-to-end.
+      </p>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  STAR CTA  ──── -->
+  <section class="bg-gradient-to-br from-fire-500/10 via-transparent to-pink-500/10 border-y border-white/5">
+    <div class="max-w-4xl mx-auto px-6 py-20 text-center">
+      <div class="text-5xl mb-4">🌟</div>
+      <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+        Saved you a fan-out?
+      </h2>
+      <p class="text-gray-400 max-w-xl mx-auto mb-8">
+        firepack is built bootstrap-style — every feature lands when a real
+        consumer hits a real pain. If it saved you boilerplate, star the
+        repo so others can find it.
+      </p>
+      <a href="https://github.com/moinsen-dev/firepack"
+         class="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition shadow-lg">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.07 3.29 9.38 7.86 10.9.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.16 1.18.92-.26 1.9-.39 2.88-.39.98 0 1.96.13 2.88.39 2.2-1.49 3.16-1.18 3.16-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.84 1.18 3.1 0 4.43-2.7 5.41-5.27 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56 4.57-1.52 7.85-5.83 7.85-10.9C23.5 5.65 18.35.5 12 .5z"/></svg>
+        Star firepack on GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- ────────────────────────────────────────────  FOOTER  ──── -->
+  <footer class="bg-[#0a0a0a] border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">🔥</span>
+        <span class="font-bold text-white">firepack</span>
+        <span>·</span>
+        <span>MIT licensed</span>
+      </div>
+      <div class="flex items-center gap-5">
+        <a href="https://github.com/moinsen-dev/firepack" class="hover:text-white transition">GitHub</a>
+        <a href="https://github.com/moinsen-dev/firepack/blob/develop/docs/SPEC.md" class="hover:text-white transition">Spec</a>
+        <a href="https://github.com/moinsen-dev/firepack/blob/develop/docs/PHILOSOPHY.md" class="hover:text-white transition">Philosophy</a>
+        <a href="https://github.com/moinsen-dev/firepack/blob/develop/docs/ROADMAP.md" class="hover:text-white transition">Roadmap</a>
+        <a href="https://github.com/moinsen-dev/firepack/blob/develop/CHANGELOG.md" class="hover:text-white transition">Changelog</a>
+      </div>
+      <div>
+        Built by <a href="https://github.com/moinsen-dev" class="hover:text-white transition">@moinsen-dev</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Tabs
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panes = document.querySelectorAll('[data-tab-content]');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      const target = t.dataset.tab;
+      tabs.forEach(b => {
+        const active = b.dataset.tab === target;
+        b.classList.toggle('tab-active', active);
+        b.classList.toggle('text-gray-500', !active);
+      });
+      panes.forEach(p => p.classList.toggle('hidden', p.dataset.tabContent !== target));
+    }));
+
+    // Highlight all code blocks
+    if (window.hljs) {
+      document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+    }
+  </script>
+
+</body>
+</html>
