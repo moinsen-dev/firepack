@@ -46,11 +46,11 @@ collections:
     test('matches the bundled blog fixture', () {
       // Semantic check: every `(collectionGroup, fields[])` tuple in the
       // generated output must be present in the fixture, and vice versa.
-      // Frozen snapshot of `example/blog.firepack.yaml` — re-generate the
+      // Frozen snapshot of `example/firepack.yaml` — re-generate the
       // fixture with `firepack regen --target indexes --spec
-      // example/blog.firepack.yaml --out test/fixtures/blog.indexes.expected.json`
+      // example/firepack.yaml --out test/fixtures/blog.indexes.expected.json`
       // when the example legitimately changes.
-      final yaml = File('example/blog.firepack.yaml').readAsStringSync();
+      final yaml = File('example/firepack.yaml').readAsStringSync();
       final spec = FirepackParser().parse(yaml);
       final generated = generateIndexesJson(spec);
       final fixture = File('test/fixtures/blog.indexes.expected.json')

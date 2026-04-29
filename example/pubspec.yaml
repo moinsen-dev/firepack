@@ -1,0 +1,26 @@
+name: firepack_example
+description: >
+  Minimal Flutter + Riverpod app that consumes firepack-generated
+  models and repositories from `example/firepack.yaml`. Exists as
+  a compile-time smoke-test for the toolchain — proves that what
+  `firepack regen` emits is actually buildable in a real Flutter app.
+
+  This is *not* a runnable demo against a live Firestore. To run it
+  you'd need a Firebase project + `flutterfire configure`. The point
+  here is `flutter analyze` clean.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.4
+
+dev_dependencies:
+  flutter_lints: ^5.0.0

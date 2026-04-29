@@ -21,7 +21,7 @@ collections:
     });
 
     test('parses the bundled blog example end-to-end', () {
-      final yaml = File('example/blog.firepack.yaml').readAsStringSync();
+      final yaml = File('example/firepack.yaml').readAsStringSync();
       final spec = FirepackParser().parse(yaml);
       expect(spec.collections.length, 4);
       expect(spec.storage.length, 2);

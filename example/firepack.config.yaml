@@ -1,24 +1,33 @@
-# firepack watch config — example for the bundled blog spec.
+# firepack watch config — for the bundled example app.
 #
-# Run from this directory:
-#   firepack watch --spec blog.firepack.yaml --config firepack.config.yaml
+# Run from this directory (example/):
+#   firepack watch
 #
-# In real consumption, this file lives next to YOUR `firepack.yaml`
-# in YOUR repo (NOT inside firepack/example) — see for instance the
-# WorkBrief consumer at `~/work/moinsen/ideas/work_brief/app/firepack.config.yaml`.
+# `--spec firepack.yaml --config firepack.config.yaml` are picked up by
+# default since both files live next to each other. Editing `firepack.yaml`
+# regenerates models, repos, indexes, rules, storage paths, and the
+# Mermaid diagram in-place — the example Flutter app picks them up
+# immediately.
+#
+# In real consumption, a file like this lives next to YOUR `firepack.yaml`
+# in YOUR repo (NOT inside firepack's own example tree).
 
 targets:
 
   indexes:
-    out: /tmp/blog.indexes.json
+    out: firestore.indexes.json
 
   rules:
-    out: /tmp/blog.rules
+    out: firestore.rules
 
   models:
-    out: /tmp/blog/models
-    collection: posts
+    out: lib/firepack/models
 
   repos:
-    out: /tmp/blog/repos
-    collection: posts
+    out: lib/firepack/repositories
+
+  storage:
+    out: lib/firepack/storage_paths.dart
+
+  viz:
+    out: DATA_MODEL.md

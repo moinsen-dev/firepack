@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// PERMISSIVE rules for the local Firebase emulator only.
+//
+// The real, firepack-generated rules live in `firestore.rules` (deny-all
+// today because the bundled blog spec doesn't declare per-collection
+// `rules:` blocks). For the emulator-PoC we want zero-friction reads
+// and writes, so this file is wired in `firebase.json` instead.
+//
+// Real consumers point firebase.json at the GENERATED `firestore.rules`
+// — and add real `rules:` blocks to their spec.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

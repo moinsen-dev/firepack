@@ -1,0 +1,8 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Generated files use lower_case_with_underscores from the spec — we
+    # don't want firepack-emitted code to ever fail analysis. If a real
+    # warning shows up here, fix the generator, not this allow-list.
+    invalid_annotation_target: ignore
