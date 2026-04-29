@@ -59,7 +59,14 @@ String generateRepositoryFile(
   buf.writeln("import 'package:flutter_riverpod/flutter_riverpod.dart';");
   buf.writeln();
   buf.writeln("import '../../core/data/firestore_paths.dart';");
-  if (collection.tenant != null) {
+  // tenant_query.dart only needed when a query actually uses the
+  // tenant token (`scopedToOrg`). Skip if no query mentions it —
+  // avoids unused-import warnings on collections with by-id-only or
+  // by-arbitrary-field queries.
+  final usesTenantHelper = collection.queries.values.any(
+    (q) => q.where.contains('tenant'),
+  );
+  if (usesTenantHelper) {
     buf.writeln("import '../../core/data/tenant_query.dart';");
   }
   buf.writeln("import '$modelImport';");
