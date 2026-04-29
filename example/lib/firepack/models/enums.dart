@@ -18,11 +18,9 @@ extension PostStatusJson on PostStatus {
   static PostStatus fromJson(String s) => PostStatus.values.byName(s);
 }
 
-
 enum UserRole { admin, author, reader }
 
 extension UserRoleJson on UserRole {
   String toJson() => name;
   static UserRole fromJson(String s) => UserRole.values.byName(s);
 }
-

@@ -13,6 +13,76 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pub.dev-Release sobald Spec-Format extern stabil bleibt.
 - CI für firepack selbst (GitHub Actions: pub get + analyze + test).
 
+## [0.0.14] — 2026-04-29
+
+### Added
+- **`firestore_paths.dart` Codegen (M10).** Neuer Generator-Target
+  `paths`. Pro Collection ein `static const String <name>` in
+  `lib/firepack/paths.dart`. Schließt eine Promise-Lücke: README +
+  Repository-Generator referenzierten `FirestorePaths` seit M4 als
+  wäre es generiert — bis heute schrieben Konsumenten den Stub von
+  Hand. Default-Out, Watch-Target, regen-Target wired.
+- **`Model.toFirestore()` + `Model.fromFirestore()`.** Eigene
+  Method-Pair neben `toJson`/`fromJson`. Hält DateTime als DateTime
+  (statt ISO-String), damit `cloud_firestore` nativ Timestamps
+  schreibt/liest. Pure-JSON-Pfad bleibt erhalten für REST-Tests etc.
+- **Duck-typed `_toDateTime` / `_toDateTimeOrNull` Helpers.** Pro
+  Model-File emittiert sobald min. ein DateTime-Field existiert.
+  Akzeptieren `Timestamp` (cloud_firestore), `DateTime`, oder
+  ISO-String. Vermeiden cloud_firestore-Import in Models — Models
+  bleiben framework-agnostic.
+- **`serverDefault: now` ist jetzt ein echtes Feature.** Repository
+  `add()` injiziert `FieldValue.serverTimestamp()` für markierte
+  Felder, überschreibt Client-Werte. Klar dokumentiert im
+  doc-comment des emittierten add().
+
+### Changed (breaking für bestehende Konsumenten)
+- **Generated Repository-Imports umgezogen** von
+  `'../../core/data/firestore_paths.dart'` und
+  `'../../core/data/tenant_query.dart'` auf `'../paths.dart'` und
+  `'../tenant_query.dart'`. Begründung: alles firepack-bezogene
+  zentriert sich auf `lib/firepack/`. Migration: paths.dart wird
+  jetzt generiert (`firepack regen --target paths`); tenant_query
+  bleibt hand-written aber an neuem Pfad.
+- **Repositories nutzen `fromFirestore`/`toFirestore`** statt
+  `fromJson`/`toJson` für Firestore-IO. Models behalten beide
+  Method-Pairs.
+
+### Fixed
+- **Echter Bug: DateTime ↔ Timestamp.** Vorher: generated
+  `fromJson` machte `DateTime.parse(json[field] as String)`,
+  Firestore liefert aber `Timestamp`-Objekte. Reads von
+  Firestore-Dokumenten mit DateTime-Feldern crashten mit
+  `TypeError: Timestamp is not a String`. Die bisherige Demo lief
+  nur weil `toJson` `.toIso8601String()` ausgab und Firestore
+  damit Strings statt Timestamps speicherte (was Range-Queries auf
+  Datumsfelder ebenfalls brach). Jetzt sauber roundtrip-fähig.
+
+### WorkBrief-Konsumption
+- Folgender Migrations-Schritt (separater Commit dort): paths.dart
+  via `firepack regen --target paths` einziehen, hand-written
+  `firestore_paths.dart` löschen, Repository-Imports flowen durch
+  Codegen.
+
+### Reflexion
+| Phase | Schätzung | Realität |
+|---|---|---|
+| paths.dart-Codegen + Test + Wiring | 10 min | ~6 min |
+| toFirestore/fromFirestore + serverDefault + Tests | 20 min | ~12 min |
+| Example-Restruktur + flutter-analyze grün | 5 min | ~3 min |
+| **Gesamt M10** | **35 min** | **~21 min** |
+
+Lessons:
+- **String-Snapshot-Tests konnten den Timestamp-Bug nicht fangen.**
+  Das Example-Smoke-Test (M9) hat ihn auch nicht gezeigt weil die
+  Demo nur ISO-Strings schrieb und las — der Bug zeigte sich erst
+  im hypothetischen Cross-Tool-Roundtrip (Cloud Function schreibt
+  Timestamp → App liest → Crash). Lehre: für Firestore-bezogene
+  Codegens braucht es einen echten Emulator-Roundtrip-Test.
+- **Pure-JSON ↔ Firestore-Native Trennung** ist die richtige
+  Abstraktion. Versuch, `toJson` zu überladen, hätte die
+  REST-Konsumption gebrochen.
+
 ## [0.0.13] — 2026-04-29
 
 ### Fixed

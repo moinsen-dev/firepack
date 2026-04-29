@@ -33,9 +33,8 @@ String generateIndexesJson(Spec spec) {
     buf.writeln('      "fields": [');
     for (var j = 0; j < entry.index.fields.length; j++) {
       final field = entry.index.fields[j];
-      final order = field.direction == IndexDirection.desc
-          ? 'DESCENDING'
-          : 'ASCENDING';
+      final order =
+          field.direction == IndexDirection.desc ? 'DESCENDING' : 'ASCENDING';
       final comma = j == entry.index.fields.length - 1 ? '' : ',';
       buf.writeln(
         '        { "fieldPath": "${field.name}", "order": "$order" }$comma',

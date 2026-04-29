@@ -22,23 +22,36 @@ class Organization {
     String? id,
     String? name,
     DateTime? createdAt,
-  }) => Organization(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    createdAt: createdAt ?? this.createdAt,
-  );
+  }) =>
+      Organization(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toIso8601String(),
-  };
+        'id': id,
+        'name': name,
+        'createdAt': createdAt.toIso8601String(),
+      };
 
   factory Organization.fromJson(Map<String, dynamic> json) => Organization(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    createdAt: DateTime.parse(json['createdAt'] as String),
-  );
+        id: json['id'] as String,
+        name: json['name'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+      );
+
+  Map<String, dynamic> toFirestore() => {
+        'id': id,
+        'name': name,
+        'createdAt': createdAt,
+      };
+
+  factory Organization.fromFirestore(Map<String, dynamic> data) => Organization(
+        id: data['id'] as String,
+        name: data['name'] as String,
+        createdAt: _toDateTime(data['createdAt']),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -50,9 +63,16 @@ class Organization {
           createdAt == other.createdAt;
 
   @override
-  int get hashCode => Object.hash(
-        id,
-        name,
-        createdAt
-      );
+  int get hashCode => Object.hash(id, name, createdAt);
+}
+
+// Duck-typed Timestamp → DateTime conversion. Accepts whatever
+// Firestore returns (Timestamp), or already-DateTime values from
+// in-memory tests, or ISO strings from JSON. Avoids importing
+// cloud_firestore here so models stay framework-agnostic.
+DateTime _toDateTime(dynamic raw) {
+  if (raw is DateTime) return raw;
+  if (raw is String) return DateTime.parse(raw);
+  // Timestamp from cloud_firestore — duck-typed via toDate().
+  return (raw as dynamic).toDate() as DateTime;
 }

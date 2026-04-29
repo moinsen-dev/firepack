@@ -49,47 +49,92 @@ class Post {
     PostStatus? status,
     DateTime? createdAt,
     DateTime? publishedAt,
-  }) => Post(
-    id: id ?? this.id,
-    organizationId: organizationId ?? this.organizationId,
-    authorId: authorId ?? this.authorId,
-    title: title ?? this.title,
-    body: body ?? this.body,
-    coverImage: coverImage ?? this.coverImage,
-    attachments: attachments ?? this.attachments,
-    linkPreview: linkPreview ?? this.linkPreview,
-    status: status ?? this.status,
-    createdAt: createdAt ?? this.createdAt,
-    publishedAt: publishedAt ?? this.publishedAt,
-  );
+  }) =>
+      Post(
+        id: id ?? this.id,
+        organizationId: organizationId ?? this.organizationId,
+        authorId: authorId ?? this.authorId,
+        title: title ?? this.title,
+        body: body ?? this.body,
+        coverImage: coverImage ?? this.coverImage,
+        attachments: attachments ?? this.attachments,
+        linkPreview: linkPreview ?? this.linkPreview,
+        status: status ?? this.status,
+        createdAt: createdAt ?? this.createdAt,
+        publishedAt: publishedAt ?? this.publishedAt,
+      );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'organizationId': organizationId,
-    'authorId': authorId,
-    'title': title,
-    'body': body,
-    if (coverImage != null) 'coverImage': coverImage,
-    'attachments': attachments,
-    if (linkPreview != null) 'linkPreview': linkPreview?.toJson(),
-    'status': status.toJson(),
-    'createdAt': createdAt.toIso8601String(),
-    if (publishedAt != null) 'publishedAt': publishedAt?.toIso8601String(),
-  };
+        'id': id,
+        'organizationId': organizationId,
+        'authorId': authorId,
+        'title': title,
+        'body': body,
+        if (coverImage != null) 'coverImage': coverImage,
+        'attachments': attachments,
+        if (linkPreview != null) 'linkPreview': linkPreview?.toJson(),
+        'status': status.toJson(),
+        'createdAt': createdAt.toIso8601String(),
+        if (publishedAt != null) 'publishedAt': publishedAt?.toIso8601String(),
+      };
 
   factory Post.fromJson(Map<String, dynamic> json) => Post(
-    id: json['id'] as String,
-    organizationId: json['organizationId'] as String,
-    authorId: json['authorId'] as String,
-    title: json['title'] as String,
-    body: json['body'] as String,
-    coverImage: json['coverImage'] as String?,
-    attachments: json['attachments'] == null ? const [] : (json['attachments'] as List).cast<String>(),
-    linkPreview: json['linkPreview'] == null ? null : LinkPreview.fromJson((json['linkPreview'] as Map).cast<String, dynamic>()),
-    status: json['status'] == null ? PostStatus.draft : PostStatusJson.fromJson(json['status'] as String),
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    publishedAt: json['publishedAt'] == null ? null : DateTime.parse(json['publishedAt'] as String),
-  );
+        id: json['id'] as String,
+        organizationId: json['organizationId'] as String,
+        authorId: json['authorId'] as String,
+        title: json['title'] as String,
+        body: json['body'] as String,
+        coverImage: json['coverImage'] as String?,
+        attachments: json['attachments'] == null
+            ? const []
+            : (json['attachments'] as List).cast<String>(),
+        linkPreview: json['linkPreview'] == null
+            ? null
+            : LinkPreview.fromJson(
+                (json['linkPreview'] as Map).cast<String, dynamic>()),
+        status: json['status'] == null
+            ? PostStatus.draft
+            : PostStatusJson.fromJson(json['status'] as String),
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        publishedAt: json['publishedAt'] == null
+            ? null
+            : DateTime.parse(json['publishedAt'] as String),
+      );
+
+  Map<String, dynamic> toFirestore() => {
+        'id': id,
+        'organizationId': organizationId,
+        'authorId': authorId,
+        'title': title,
+        'body': body,
+        if (coverImage != null) 'coverImage': coverImage,
+        'attachments': attachments,
+        if (linkPreview != null) 'linkPreview': linkPreview?.toFirestore(),
+        'status': status.toJson(),
+        'createdAt': createdAt,
+        if (publishedAt != null) 'publishedAt': publishedAt,
+      };
+
+  factory Post.fromFirestore(Map<String, dynamic> data) => Post(
+        id: data['id'] as String,
+        organizationId: data['organizationId'] as String,
+        authorId: data['authorId'] as String,
+        title: data['title'] as String,
+        body: data['body'] as String,
+        coverImage: data['coverImage'] as String?,
+        attachments: data['attachments'] == null
+            ? const []
+            : (data['attachments'] as List).cast<String>(),
+        linkPreview: data['linkPreview'] == null
+            ? null
+            : LinkPreview.fromFirestore(
+                (data['linkPreview'] as Map).cast<String, dynamic>()),
+        status: data['status'] == null
+            ? PostStatus.draft
+            : PostStatusJson.fromJson(data['status'] as String),
+        createdAt: _toDateTime(data['createdAt']),
+        publishedAt: _toDateTimeOrNull(data['publishedAt']),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -110,18 +155,17 @@ class Post {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        organizationId,
-        authorId,
-        title,
-        body,
-        coverImage,
-        Object.hashAll(attachments),
-        linkPreview,
-        status,
-        createdAt,
-        publishedAt
-      );
+      id,
+      organizationId,
+      authorId,
+      title,
+      body,
+      coverImage,
+      Object.hashAll(attachments),
+      linkPreview,
+      status,
+      createdAt,
+      publishedAt);
 }
 
 // Deep list equality — private to this file (no external deps).
@@ -134,3 +178,17 @@ bool _listEq(List<dynamic>? a, List<dynamic>? b) {
   }
   return true;
 }
+
+// Duck-typed Timestamp → DateTime conversion. Accepts whatever
+// Firestore returns (Timestamp), or already-DateTime values from
+// in-memory tests, or ISO strings from JSON. Avoids importing
+// cloud_firestore here so models stay framework-agnostic.
+DateTime _toDateTime(dynamic raw) {
+  if (raw is DateTime) return raw;
+  if (raw is String) return DateTime.parse(raw);
+  // Timestamp from cloud_firestore — duck-typed via toDate().
+  return (raw as dynamic).toDate() as DateTime;
+}
+
+DateTime? _toDateTimeOrNull(dynamic raw) =>
+    raw == null ? null : _toDateTime(raw);

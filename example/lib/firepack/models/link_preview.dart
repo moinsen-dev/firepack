@@ -25,26 +25,41 @@ class LinkPreview {
     String? title,
     String? description,
     String? imageUrl,
-  }) => LinkPreview(
-    url: url ?? this.url,
-    title: title ?? this.title,
-    description: description ?? this.description,
-    imageUrl: imageUrl ?? this.imageUrl,
-  );
+  }) =>
+      LinkPreview(
+        url: url ?? this.url,
+        title: title ?? this.title,
+        description: description ?? this.description,
+        imageUrl: imageUrl ?? this.imageUrl,
+      );
 
   Map<String, dynamic> toJson() => {
-    'url': url,
-    'title': title,
-    if (description != null) 'description': description,
-    if (imageUrl != null) 'imageUrl': imageUrl,
-  };
+        'url': url,
+        'title': title,
+        if (description != null) 'description': description,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      };
 
   factory LinkPreview.fromJson(Map<String, dynamic> json) => LinkPreview(
-    url: json['url'] as String,
-    title: json['title'] as String,
-    description: json['description'] as String?,
-    imageUrl: json['imageUrl'] as String?,
-  );
+        url: json['url'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String?,
+        imageUrl: json['imageUrl'] as String?,
+      );
+
+  Map<String, dynamic> toFirestore() => {
+        'url': url,
+        'title': title,
+        if (description != null) 'description': description,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      };
+
+  factory LinkPreview.fromFirestore(Map<String, dynamic> data) => LinkPreview(
+        url: data['url'] as String,
+        title: data['title'] as String,
+        description: data['description'] as String?,
+        imageUrl: data['imageUrl'] as String?,
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -57,10 +72,5 @@ class LinkPreview {
           imageUrl == other.imageUrl;
 
   @override
-  int get hashCode => Object.hash(
-        url,
-        title,
-        description,
-        imageUrl
-      );
+  int get hashCode => Object.hash(url, title, description, imageUrl);
 }

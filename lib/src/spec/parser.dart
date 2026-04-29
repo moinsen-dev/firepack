@@ -214,7 +214,8 @@ class FirepackParser {
   }) {
     // Field can be either a shorthand string ("string") or a YamlMap.
     if (node is String) {
-      return FieldSpec(name: name, type: _parseType(node, owner: owner, field: name));
+      return FieldSpec(
+          name: name, type: _parseType(node, owner: owner, field: name));
     }
     if (node is! YamlMap) {
       throw FormatException(
@@ -354,9 +355,8 @@ class FirepackParser {
       final s = f.toString();
       if (s.contains(':')) {
         final parts = s.split(':');
-        final dir = parts[1] == 'desc'
-            ? IndexDirection.desc
-            : IndexDirection.asc;
+        final dir =
+            parts[1] == 'desc' ? IndexDirection.desc : IndexDirection.asc;
         fields.add(IndexField(parts[0], dir));
       } else {
         fields.add(IndexField(s, IndexDirection.asc));

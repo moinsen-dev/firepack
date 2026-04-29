@@ -7,8 +7,8 @@ import '../spec/spec.dart';
 /// // GENERATED — header
 /// import 'package:cloud_firestore/cloud_firestore.dart';
 /// import 'package:flutter_riverpod/flutter_riverpod.dart';
-/// import '../../core/data/firestore_paths.dart';
-/// import '../../core/data/tenant_query.dart';
+/// import '../paths.dart';
+/// import '../tenant_query.dart';
 /// import '../models/<col>.dart';
 ///
 /// class <Cls>Repository {
@@ -22,7 +22,7 @@ import '../spec/spec.dart';
 ///   Future<void> deleteById(String id) => …;
 ///
 ///   <Cls> _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
-///       <Cls>.fromJson({...d.data(), 'id': d.id});
+///       <Cls>.fromFirestore({...d.data(), 'id': d.id});
 /// }
 ///
 /// final <cls>RepositoryProvider = Provider(...);
@@ -60,7 +60,7 @@ String generateRepositoryFile(
   buf.writeln("import 'package:cloud_firestore/cloud_firestore.dart';");
   buf.writeln("import 'package:flutter_riverpod/flutter_riverpod.dart';");
   buf.writeln();
-  buf.writeln("import '../../core/data/firestore_paths.dart';");
+  buf.writeln("import '../paths.dart';");
   // tenant_query.dart only needed when a query actually uses the
   // tenant token (`scopedToOrg`). Skip if no query mentions it —
   // avoids unused-import warnings on collections with by-id-only or
@@ -69,7 +69,7 @@ String generateRepositoryFile(
     (q) => q.where.contains('tenant'),
   );
   if (usesTenantHelper) {
-    buf.writeln("import '../../core/data/tenant_query.dart';");
+    buf.writeln("import '../tenant_query.dart';");
   }
   buf.writeln("import '$modelImport';");
   buf.writeln();
@@ -87,45 +87,66 @@ String generateRepositoryFile(
   }
 
   // Mutation helpers — same shape every time, deterministic.
+  // Fields with `serverDefault: now` get FieldValue.serverTimestamp()
+  // injected by add() — server clock wins over client clock.
+  final serverNowFields = collection.fields.values
+      .where((f) =>
+          f.type == FieldType.dateTime && f.serverDefault == ServerDefault.now)
+      .map((f) => f.name)
+      .toList();
+
   buf.writeln('  /// Sets the doc by primary-key id (overwrites existing).');
+  if (serverNowFields.isNotEmpty) {
+    buf.writeln('  /// Fields with `serverDefault: now` in the spec '
+        '(${serverNowFields.join(', ')}) are');
+    buf.writeln('  /// overwritten with FieldValue.serverTimestamp() — '
+        'client values are ignored.');
+  }
   buf.writeln('  Future<void> add($cls doc) {');
-  buf.writeln(
-      '    return _firestore.collection(FirestorePaths.$pathToken)');
-  buf.writeln('        .doc(doc.id)');
-  buf.writeln('        .set(doc.toJson());');
+  if (serverNowFields.isEmpty) {
+    buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
+    buf.writeln('        .doc(doc.id)');
+    buf.writeln('        .set(doc.toFirestore());');
+  } else {
+    buf.writeln('    final data = doc.toFirestore();');
+    for (final name in serverNowFields) {
+      buf.writeln("    data['$name'] = FieldValue.serverTimestamp();");
+    }
+    buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
+    buf.writeln('        .doc(doc.id)');
+    buf.writeln('        .set(data);');
+  }
   buf.writeln('  }');
   buf.writeln();
-  buf.writeln('  /// Patches a subset of fields without round-tripping the model.');
-  buf.writeln('  Future<void> updateById(String id, Map<String, dynamic> fields) {');
   buf.writeln(
-      '    return _firestore.collection(FirestorePaths.$pathToken)');
+      '  /// Patches a subset of fields without round-tripping the model.');
+  buf.writeln(
+      '  Future<void> updateById(String id, Map<String, dynamic> fields) {');
+  buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
   buf.writeln('        .doc(id)');
   buf.writeln('        .update(fields);');
   buf.writeln('  }');
   buf.writeln();
   buf.writeln('  Future<void> deleteById(String id) {');
-  buf.writeln(
-      '    return _firestore.collection(FirestorePaths.$pathToken)');
+  buf.writeln('    return _firestore.collection(FirestorePaths.$pathToken)');
   buf.writeln('        .doc(id)');
   buf.writeln('        .delete();');
   buf.writeln('  }');
   buf.writeln();
 
   // _fromDoc helper — every QueryDocumentSnapshot → model conversion
-  // routes through here. Centralises the {...d.data(), 'id': d.id} merge
-  // so we don't sprinkle it across every query method.
+  // routes through here. Uses fromFirestore so Timestamp fields work
+  // correctly (DateTime.parse-on-String would crash on Firestore reads).
   buf.writeln(
       '  $cls _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) =>');
-  buf.writeln(
-      '      $cls.fromJson({...d.data(), \'id\': d.id});');
+  buf.writeln('      $cls.fromFirestore({...d.data(), \'id\': d.id});');
   buf.writeln('}');
 
   // Riverpod providers
   buf.writeln();
   final repoVar = _lowerFirst(repo);
   buf.writeln('final ${repoVar}Provider = Provider<$repo>((ref) =>');
-  buf.writeln(
-      '    $repo(FirebaseFirestore.instance));');
+  buf.writeln('    $repo(FirebaseFirestore.instance));');
 
   for (final q in collection.queries.values) {
     buf.writeln();
@@ -152,6 +173,7 @@ class _ParsedQuery {
 
 class _WherePart {
   final String field;
+
   /// 'isEqualTo' | 'arrayContains' | 'literalEquals' | 'whereInLiteral' | 'whereInParam'
   final String op;
   final String? param; // when present, becomes a method arg
@@ -187,8 +209,7 @@ _ParsedQuery _parseQuery(QuerySpec q) {
       continue;
     }
     // "field in [a, b, c]" — literal list, inlined as const at codegen
-    final whereInLitMatch =
-        RegExp(r'^(\w+)\s+in\s*\[(.*)\]$').firstMatch(s);
+    final whereInLitMatch = RegExp(r'^(\w+)\s+in\s*\[(.*)\]$').firstMatch(s);
     if (whereInLitMatch != null) {
       final field = whereInLitMatch.group(1)!;
       final inner = whereInLitMatch.group(2)!;
@@ -212,8 +233,7 @@ _ParsedQuery _parseQuery(QuerySpec q) {
       continue;
     }
     // "field in $param" — parameterized list, method gets List<String>
-    final whereInParamMatch =
-        RegExp(r'^(\w+)\s+in\s+\$(\w+)$').firstMatch(s);
+    final whereInParamMatch = RegExp(r'^(\w+)\s+in\s+\$(\w+)$').firstMatch(s);
     if (whereInParamMatch != null) {
       pq.wheres.add(_WherePart(
         field: whereInParamMatch.group(1)!,
@@ -273,7 +293,7 @@ String _emitQueryMethod(
           .doc(id)
           .snapshots()
           .map((d) => d.exists
-              ? $cls.fromJson({...?d.data(), 'id': d.id})
+              ? $cls.fromFirestore({...?d.data(), 'id': d.id})
               : null);''';
   }
 
@@ -290,8 +310,7 @@ String _emitQueryMethod(
 
   final paramStr = params.join(', ');
   final buf = StringBuffer();
-  buf.writeln(
-      '  Stream<List<$cls>> ${q.name}($paramStr) =>');
+  buf.writeln('  Stream<List<$cls>> ${q.name}($paramStr) =>');
   buf.write('      _firestore.collection(FirestorePaths.$pathToken)');
   if (pq.wantsTenant) {
     buf.writeln();
@@ -308,8 +327,7 @@ String _emitQueryMethod(
       buf.write('          .where(\'${w.field}\', arrayContains: ${w.param})');
     } else if (w.op == 'whereInLiteral' && w.literalList != null) {
       final values = w.literalList!.map((v) => "'$v'").join(', ');
-      buf.write(
-          '          .where(\'${w.field}\', whereIn: const [$values])');
+      buf.write('          .where(\'${w.field}\', whereIn: const [$values])');
     } else if (w.op == 'whereInParam' && w.param != null) {
       buf.write('          .where(\'${w.field}\', whereIn: ${w.param})');
     }
@@ -395,25 +413,27 @@ String _modelImportFor(CollectionSpec c) {
   // Respect className override: AuditLogEntry → audit_log_entry.dart;
   // otherwise default convention: workBriefs → work_brief.dart.
   if (c.className != null) {
-    final snake = c.className!.replaceAllMapped(
-      RegExp(r'(?<=.)([A-Z])'),
-      (m) => '_${m.group(0)!.toLowerCase()}',
-    ).toLowerCase();
+    final snake = c.className!
+        .replaceAllMapped(
+          RegExp(r'(?<=.)([A-Z])'),
+          (m) => '_${m.group(0)!.toLowerCase()}',
+        )
+        .toLowerCase();
     return '../models/$snake.dart';
   }
   final snake = c.name.replaceAllMapped(
     RegExp(r'[A-Z]'),
     (m) => '_${m.group(0)!.toLowerCase()}',
   );
-  final singular = snake.endsWith('s') ? snake.substring(0, snake.length - 1) : snake;
+  final singular =
+      snake.endsWith('s') ? snake.substring(0, snake.length - 1) : snake;
   return '../models/$singular.dart';
 }
 
 String _lowerFirst(String s) =>
     s.isEmpty ? s : s[0].toLowerCase() + s.substring(1);
 
-String _pascal(String s) =>
-    s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+String _pascal(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
 String _fileNameFor(String collectionName) {
   final snake = collectionName.replaceAllMapped(
@@ -442,8 +462,9 @@ Map<String, String> generateAllRepositories(
   return out;
 }
 
-String _classNameToSnake(String className) =>
-    className.replaceAllMapped(
+String _classNameToSnake(String className) => className
+    .replaceAllMapped(
       RegExp(r'(?<=.)([A-Z])'),
       (m) => '_${m.group(0)!.toLowerCase()}',
-    ).toLowerCase();
+    )
+    .toLowerCase();

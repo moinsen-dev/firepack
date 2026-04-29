@@ -35,11 +35,12 @@ collections:
       expect(out, contains('required String organizationId,'));
       expect(out, contains('required String briefId,'));
       expect(out, contains('required String evidenceId,'));
-      expect(out, contains(
-          "=> 'evidence/\$organizationId/\$briefId/\$evidenceId';"));
-      expect(out, contains(
-          "static const List<String> evidenceFilesContentTypes = "
-          "['image/jpeg', 'image/png'];"));
+      expect(out,
+          contains("=> 'evidence/\$organizationId/\$briefId/\$evidenceId';"));
+      expect(
+          out,
+          contains("static const List<String> evidenceFilesContentTypes = "
+              "['image/jpeg', 'image/png'];"));
     });
 
     test('handles bucket with no path variables', () {
@@ -72,8 +73,7 @@ collections:
 ''');
       final out = generateStoragePathsFile(spec)!;
       // exactly one `required String orgId,` line
-      final orgIdLines =
-          'required String orgId,'.allMatches(out).length;
+      final orgIdLines = 'required String orgId,'.allMatches(out).length;
       expect(orgIdLines, 1);
     });
   });

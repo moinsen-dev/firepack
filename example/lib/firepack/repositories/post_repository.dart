@@ -9,24 +9,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/data/firestore_paths.dart';
-import '../../core/data/tenant_query.dart';
+import '../paths.dart';
+import '../tenant_query.dart';
 import '../models/post.dart';
 
 class PostRepository {
   final FirebaseFirestore _firestore;
   PostRepository(this._firestore);
 
-  Stream<List<Post>> watchByOrg(String orgId) =>
-      _firestore.collection(FirestorePaths.posts)
-          .scopedToOrg(orgId)
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots()
-          .map((s) => s.docs.map(_fromDoc).toList());
+  Stream<List<Post>> watchByOrg(String orgId) => _firestore
+      .collection(FirestorePaths.posts)
+      .scopedToOrg(orgId)
+      .orderBy('createdAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map((s) => s.docs.map(_fromDoc).toList());
 
   Stream<List<Post>> watchByOrgAndStatus(String orgId, String status) =>
-      _firestore.collection(FirestorePaths.posts)
+      _firestore
+          .collection(FirestorePaths.posts)
           .scopedToOrg(orgId)
           .where('status', isEqualTo: status)
           .orderBy('createdAt', descending: true)
@@ -34,45 +35,42 @@ class PostRepository {
           .map((s) => s.docs.map(_fromDoc).toList());
 
   Stream<Post?> watchById(String id) =>
-      _firestore.collection(FirestorePaths.posts)
-          .doc(id)
-          .snapshots()
-          .map((d) => d.exists
-              ? Post.fromJson({...?d.data(), 'id': d.id})
-              : null);
+      _firestore.collection(FirestorePaths.posts).doc(id).snapshots().map((d) =>
+          d.exists ? Post.fromFirestore({...?d.data(), 'id': d.id}) : null);
 
   /// Sets the doc by primary-key id (overwrites existing).
+  /// Fields with `serverDefault: now` in the spec (createdAt) are
+  /// overwritten with FieldValue.serverTimestamp() — client values are ignored.
   Future<void> add(Post doc) {
-    return _firestore.collection(FirestorePaths.posts)
-        .doc(doc.id)
-        .set(doc.toJson());
+    final data = doc.toFirestore();
+    data['createdAt'] = FieldValue.serverTimestamp();
+    return _firestore.collection(FirestorePaths.posts).doc(doc.id).set(data);
   }
 
   /// Patches a subset of fields without round-tripping the model.
   Future<void> updateById(String id, Map<String, dynamic> fields) {
-    return _firestore.collection(FirestorePaths.posts)
-        .doc(id)
-        .update(fields);
+    return _firestore.collection(FirestorePaths.posts).doc(id).update(fields);
   }
 
   Future<void> deleteById(String id) {
-    return _firestore.collection(FirestorePaths.posts)
-        .doc(id)
-        .delete();
+    return _firestore.collection(FirestorePaths.posts).doc(id).delete();
   }
 
   Post _fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
-      Post.fromJson({...d.data(), 'id': d.id});
+      Post.fromFirestore({...d.data(), 'id': d.id});
 }
 
-final postRepositoryProvider = Provider<PostRepository>((ref) =>
-    PostRepository(FirebaseFirestore.instance));
+final postRepositoryProvider = Provider<PostRepository>(
+    (ref) => PostRepository(FirebaseFirestore.instance));
 
 final postWatchByOrgProvider = StreamProvider.family<List<Post>, String>(
     (ref, orgId) => ref.watch(postRepositoryProvider).watchByOrg(orgId));
 
-final postWatchByOrgAndStatusProvider = StreamProvider.family<List<Post>, ({String orgId, String status})>(
-    (ref, args) => ref.watch(postRepositoryProvider).watchByOrgAndStatus(args.orgId, args.status));
+final postWatchByOrgAndStatusProvider =
+    StreamProvider.family<List<Post>, ({String orgId, String status})>(
+        (ref, args) => ref
+            .watch(postRepositoryProvider)
+            .watchByOrgAndStatus(args.orgId, args.status));
 
 final postWatchByIdProvider = StreamProvider.family<Post?, String>(
     (ref, id) => ref.watch(postRepositoryProvider).watchById(id));

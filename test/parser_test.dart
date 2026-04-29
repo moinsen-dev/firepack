@@ -25,13 +25,13 @@ collections:
       final spec = FirepackParser().parse(yaml);
       expect(spec.collections.length, 4);
       expect(spec.storage.length, 2);
-      expect(lint(spec), isEmpty,
-          reason: 'bundled example must lint clean');
+      expect(lint(spec), isEmpty, reason: 'bundled example must lint clean');
     });
 
     test('rejects unknown spec version', () {
       expect(
-        () => FirepackParser().parse('firepack: 99\nproject: x\ncollections: {}'),
+        () =>
+            FirepackParser().parse('firepack: 99\nproject: x\ncollections: {}'),
         throwsA(isA<FormatException>()),
       );
     });
@@ -71,7 +71,8 @@ collections:
       final bucket = spec.storage['evidenceFiles']!;
       expect(bucket.path, 'evidence/{orgId}/{briefId}/{fileId}');
       expect(bucket.tenant, 'orgId');
-      expect(bucket.contentTypes, ['image/jpeg', 'image/png', 'application/pdf']);
+      expect(
+          bucket.contentTypes, ['image/jpeg', 'image/png', 'application/pdf']);
 
       final f = spec.collections['evidence']!.fields['storagePath']!;
       expect(f.type, FieldType.string);
@@ -145,8 +146,9 @@ collections:
       final mermaid = renderMermaid(spec);
       expect(mermaid, contains('evidenceFiles {'));
       expect(mermaid, contains('string path "evidence/{orgId}/{fileId}"'));
-      expect(mermaid, contains('evidence }o--|| evidenceFiles : "storagePath"'));
-      expect(mermaid, contains('storage'));  // FK-like flag in field line
+      expect(
+          mermaid, contains('evidence }o--|| evidenceFiles : "storagePath"'));
+      expect(mermaid, contains('storage')); // FK-like flag in field line
     });
   });
 }

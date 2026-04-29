@@ -19,10 +19,10 @@ collections:
         orderBy: createdAt:desc
         limit: 50
 ''');
-      final out =
-          generateRepositoryFile(spec.collections['errorReports']!);
+      final out = generateRepositoryFile(spec.collections['errorReports']!);
       expect(out, contains('class ErrorReportRepository {'));
-      expect(out, contains('Stream<List<ErrorReport>> watchByOrg(String orgId)'));
+      expect(
+          out, contains('Stream<List<ErrorReport>> watchByOrg(String orgId)'));
       expect(out, contains('.scopedToOrg(orgId)'));
       expect(out, contains(".orderBy('createdAt', descending: true)"));
       expect(out, contains('.limit(50)'));
@@ -35,6 +35,77 @@ collections:
         out,
         contains('StreamProvider.family<List<ErrorReport>, String>'),
       );
+    });
+
+    test('add() injects FieldValue.serverTimestamp() for serverDefault: now',
+        () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id:        { type: string, primaryKey: true }
+      title:     { type: string, required: true }
+      createdAt: { type: dateTime, required: true, serverDefault: now }
+    queries:
+      watchAll: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains('final data = doc.toFirestore();'));
+      expect(
+          out, contains("data['createdAt'] = FieldValue.serverTimestamp();"));
+      expect(out, contains('.set(data);'));
+    });
+
+    test('add() uses plain .set(doc.toFirestore()) without serverDefault', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id:    { type: string, primaryKey: true }
+      title: { type: string, required: true }
+    queries:
+      watchAll: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains('.set(doc.toFirestore());'));
+      expect(out, isNot(contains('FieldValue.serverTimestamp()')));
+    });
+
+    test('repos use fromFirestore (not fromJson) for reads', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id: { type: string, primaryKey: true }
+    queries:
+      watchById: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains('Post.fromFirestore({'));
+      expect(out, isNot(contains('Post.fromJson({')));
+    });
+
+    test('repos import paths.dart from the new firepack/ location', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+collections:
+  posts:
+    fields:
+      id: { type: string, primaryKey: true }
+    queries:
+      watchById: { byId: true }
+''');
+      final out = generateRepositoryFile(spec.collections['posts']!);
+      expect(out, contains("import '../paths.dart';"));
+      expect(out,
+          isNot(contains("import '../../core/data/firestore_paths.dart';")));
     });
 
     test('emits watchById for byId queries', () {
@@ -90,7 +161,10 @@ collections:
 ''');
       final out = generateRepositoryFile(spec.collections['posts']!);
       expect(out, contains('Future<void> add(Post doc)'));
-      expect(out, contains('Future<void> updateById(String id, Map<String, dynamic> fields)'));
+      expect(
+          out,
+          contains(
+              'Future<void> updateById(String id, Map<String, dynamic> fields)'));
       expect(out, contains('Future<void> deleteById(String id)'));
     });
   });
@@ -134,7 +208,8 @@ collections:
       expect(out, contains('Stream<List<Thing>> watchActive(String orgId)'));
       expect(
         out,
-        contains(".where('status', whereIn: const ['open', 'in_review', 'blocked'])"),
+        contains(
+            ".where('status', whereIn: const ['open', 'in_review', 'blocked'])"),
       );
     });
 

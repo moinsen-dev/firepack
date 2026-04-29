@@ -218,8 +218,7 @@ String renderMarkdown(SpecDiff diff) {
   buf.writeln('## firepack spec diff');
   buf.writeln();
 
-  if (diff.addedCollections.isNotEmpty ||
-      diff.removedCollections.isNotEmpty) {
+  if (diff.addedCollections.isNotEmpty || diff.removedCollections.isNotEmpty) {
     buf.writeln('### Collections');
     for (final c in diff.addedCollections) {
       buf.writeln('- ➕ **$c** added');

@@ -63,6 +63,7 @@ viz-example:
 # Run after touching a generator or the example spec — the generated tree
 # is checked in so `flutter analyze` works on a fresh clone.
 example-regen:
+    dart run bin/firepack.dart regen --target paths   --spec example/firepack.yaml --out example/lib/firepack/paths.dart
     dart run bin/firepack.dart regen --target models  --spec example/firepack.yaml --out example/lib/firepack/models
     dart run bin/firepack.dart regen --target repos   --spec example/firepack.yaml --out example/lib/firepack/repositories
     dart run bin/firepack.dart regen --target storage --spec example/firepack.yaml --out example/lib/firepack/storage_paths.dart

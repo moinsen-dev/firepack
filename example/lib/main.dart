@@ -168,7 +168,9 @@ class _EmptyState extends ConsumerWidget {
 
 /// Demonstrates the write-path through generated code: every call below
 /// goes through `PostRepository.add()` → `_firestore.collection(…).set()`,
-/// using the model's generated `toJson()` for serialisation.
+/// using the model's generated `toFirestore()` (DateTime → Timestamp).
+/// `serverDefault: now` on `createdAt` means the seeded createdAts are
+/// silently overridden by FieldValue.serverTimestamp() — by design.
 Future<void> _seedDemoPosts(WidgetRef ref, String orgId) async {
   final repo = ref.read(postRepositoryProvider);
   final now = DateTime.now();
@@ -335,10 +337,7 @@ class _PostEditorScreenState extends ConsumerState<PostEditorScreen> {
         // Use Firestore's auto-id alongside the firepack-generated repo.
         // The Post model's `id` is required, so we mint one before
         // building the immutable model.
-        final id = FirebaseFirestore.instance
-            .collection('posts')
-            .doc()
-            .id;
+        final id = FirebaseFirestore.instance.collection('posts').doc().id;
         await repo.add(Post(
           id: id,
           organizationId: widget.orgId,

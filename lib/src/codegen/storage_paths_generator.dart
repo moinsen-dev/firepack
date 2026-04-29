@@ -38,7 +38,8 @@ String? generateStoragePathsFile(Spec spec, {String? sourceFile}) {
   buf.writeln(_header(sourceFile));
   buf.writeln();
   buf.writeln('/// Typed Cloud Storage path helpers, one method per declared');
-  buf.writeln('/// bucket in the firepack spec. Use these instead of hand-typed');
+  buf.writeln(
+      '/// bucket in the firepack spec. Use these instead of hand-typed');
   buf.writeln('/// strings — drift between upload code, read code, and rules');
   buf.writeln('/// becomes impossible.');
   buf.writeln('class StoragePaths {');
@@ -77,7 +78,8 @@ void _emitBucketHelper(StringBuffer buf, StorageBucket bucket) {
     final list = bucket.contentTypes.map((c) => "'$c'").join(', ');
     buf.writeln();
     buf.writeln('  /// MIME types accepted by the `${bucket.name}` bucket.');
-    buf.writeln('  static const List<String> ${bucket.name}ContentTypes = [$list];');
+    buf.writeln(
+        '  static const List<String> ${bucket.name}ContentTypes = [$list];');
   }
 }
 

@@ -79,7 +79,8 @@ String _emitFile(
     final isReq = f.required || f.primaryKey;
     final hasDefault = f.defaultValue != null;
     final keyword = isReq && !hasDefault ? 'required ' : '';
-    final defaultPart = hasDefault ? ' = ${_dartLiteral(f.defaultValue, f, cls)}' : '';
+    final defaultPart =
+        hasDefault ? ' = ${_dartLiteral(f.defaultValue, f, cls)}' : '';
     buf.writeln('    $keyword'
         'this.${f.name}'
         '$defaultPart,');
@@ -125,12 +126,43 @@ String _emitFile(
   buf.writeln('  );');
   buf.writeln();
 
+  // toFirestore — Firestore-native variant that keeps DateTime as
+  // DateTime so the cloud_firestore plugin stores it as a Timestamp
+  // (vs. toJson which emits ISO strings). Repository codegen calls
+  // this; consumers writing to Firestore should too.
+  buf.writeln('  Map<String, dynamic> toFirestore() => {');
+  for (final f in fields.values) {
+    final omitIfNull = f.optional && !f.required;
+    final access = f.name;
+    final ser = _toFirestoreExpr(access, f);
+    if (omitIfNull) {
+      buf.writeln("    if ($access != null) '${f.name}': $ser,");
+    } else {
+      buf.writeln("    '${f.name}': $ser,");
+    }
+  }
+  buf.writeln('  };');
+  buf.writeln();
+
+  // fromFirestore — accepts Firestore-shaped maps where DateTime fields
+  // come back as Timestamp objects. Duck-typed via `.toDate()` so this
+  // file doesn't have to import cloud_firestore.
+  buf.writeln(
+      '  factory $cls.fromFirestore(Map<String, dynamic> data) => $cls(');
+  for (final f in fields.values) {
+    final readExpr = _fromFirestoreExpr("data['${f.name}']", f, cls);
+    buf.writeln('    ${f.name}: $readExpr,');
+  }
+  buf.writeln('  );');
+  buf.writeln();
+
   // operator ==
   buf.writeln('  @override');
   buf.writeln('  bool operator ==(Object other) =>');
   buf.writeln('      identical(this, other) ||');
   buf.writeln('      other is $cls &&');
-  buf.writeln('          runtimeType == other.runtimeType${fields.isEmpty ? ';' : ' &&'}');
+  buf.writeln(
+      '          runtimeType == other.runtimeType${fields.isEmpty ? ';' : ' &&'}');
   final fieldList = fields.values.toList();
   for (var i = 0; i < fieldList.length; i++) {
     final f = fieldList[i];
@@ -172,6 +204,18 @@ String _emitFile(
     }
   }
 
+  // DateTime duck-typing helper — emitted only when the model has at
+  // least one DateTime field. Lets fromFirestore() accept Timestamp
+  // (from cloud_firestore) without importing it here.
+  final hasDateTime = fields.values.any((f) => f.type == FieldType.dateTime);
+  final hasOptionalDateTime = fields.values.any(
+    (f) => f.type == FieldType.dateTime && f.optional && !f.required,
+  );
+  if (hasDateTime) {
+    buf.writeln();
+    buf.writeln(_toDateTimeHelper(emitNullable: hasOptionalDateTime));
+  }
+
   return buf.toString();
 }
 
@@ -202,8 +246,10 @@ String? generateSharedEnumsFile(Spec spec, {String? sourceFile}) {
   buf.writeln(_header(sourceFile));
   buf.writeln();
   buf.writeln('// Shared enums — referenced from models via `enum[<Name>]`.');
-  buf.writeln('// Each enum gets a `<Name>Json` extension with wireFormat-aware');
-  buf.writeln('// toJson()/fromJson() so the model layer never touches naming.');
+  buf.writeln(
+      '// Each enum gets a `<Name>Json` extension with wireFormat-aware');
+  buf.writeln(
+      '// toJson()/fromJson() so the model layer never touches naming.');
   for (final e in spec.enums.values) {
     buf.writeln();
     buf.writeln('enum ${e.name} { ${e.values.join(", ")} }');
@@ -224,8 +270,7 @@ String _emitEnumJsonExtension(EnumSpec e) {
   buf.writeln('extension ${name}Json on $name {');
   if (e.wireFormat == EnumWireFormat.dartName) {
     buf.writeln('  String toJson() => name;');
-    buf.writeln(
-        '  static $name fromJson(String s) => $name.values.byName(s);');
+    buf.writeln('  static $name fromJson(String s) => $name.values.byName(s);');
   } else {
     // snake_case
     buf.writeln('  String toJson() => switch (this) {');
@@ -248,18 +293,22 @@ String _emitEnumJsonExtension(EnumSpec e) {
 
 String _camelToSnake(String camel) {
   // workStep → work_step ; checkIn → check_in ; externalAction → external_action
-  return camel.replaceAllMapped(
-    RegExp(r'(?<=.)([A-Z])'),
-    (m) => '_${m.group(0)!.toLowerCase()}',
-  ).toLowerCase();
+  return camel
+      .replaceAllMapped(
+        RegExp(r'(?<=.)([A-Z])'),
+        (m) => '_${m.group(0)!.toLowerCase()}',
+      )
+      .toLowerCase();
 }
 
 String _nestedFileName(String typeName) {
   // WorkBriefTask → work_brief_task; ChecklistItem → checklist_item
-  return typeName.replaceAllMapped(
-    RegExp(r'(?<=.)([A-Z])'),
-    (m) => '_${m.group(0)!.toLowerCase()}',
-  ).toLowerCase();
+  return typeName
+      .replaceAllMapped(
+        RegExp(r'(?<=.)([A-Z])'),
+        (m) => '_${m.group(0)!.toLowerCase()}',
+      )
+      .toLowerCase();
 }
 
 String _eqExpr(FieldSpec f) {
@@ -273,15 +322,35 @@ String _hashExpr(FieldSpec f) {
   final n = f.name;
   final isNullable = f.optional && !f.required && !f.primaryKey;
   if (f.type == FieldType.list) {
-    return isNullable
-        ? 'Object.hashAll($n ?? const [])'
-        : 'Object.hashAll($n)';
+    return isNullable ? 'Object.hashAll($n ?? const [])' : 'Object.hashAll($n)';
   }
   if (f.type == FieldType.map) {
     final src = isNullable ? '($n ?? const {})' : n;
     return 'Object.hashAllUnordered($src.entries.map((e) => Object.hash(e.key, e.value)))';
   }
   return n;
+}
+
+String _toDateTimeHelper({required bool emitNullable}) {
+  final buf = StringBuffer();
+  buf.writeln(
+      '// Duck-typed Timestamp → DateTime conversion. Accepts whatever');
+  buf.writeln(
+      '// Firestore returns (Timestamp), or already-DateTime values from');
+  buf.writeln('// in-memory tests, or ISO strings from JSON. Avoids importing');
+  buf.writeln('// cloud_firestore here so models stay framework-agnostic.');
+  buf.writeln('DateTime _toDateTime(dynamic raw) {');
+  buf.writeln('  if (raw is DateTime) return raw;');
+  buf.writeln('  if (raw is String) return DateTime.parse(raw);');
+  buf.writeln('  // Timestamp from cloud_firestore — duck-typed via toDate().');
+  buf.writeln('  return (raw as dynamic).toDate() as DateTime;');
+  buf.writeln('}');
+  if (emitNullable) {
+    buf.writeln();
+    buf.writeln('DateTime? _toDateTimeOrNull(dynamic raw) =>');
+    buf.writeln('    raw == null ? null : _toDateTime(raw);');
+  }
+  return buf.toString();
 }
 
 String _listEqHelper() => '''
@@ -370,7 +439,8 @@ String _dartType(String className, FieldSpec f) {
       if (inner != null) {
         if (inner.nestedTypeRef != null) {
           base = 'List<${inner.nestedTypeRef}>';
-        } else if (inner.type == FieldType.string || inner.type == FieldType.ref) {
+        } else if (inner.type == FieldType.string ||
+            inner.type == FieldType.ref) {
           base = 'List<String>';
         } else {
           base = 'List<dynamic>';
@@ -425,9 +495,7 @@ String _toJsonExpr(String access, FieldSpec f) {
   final isOpt = f.optional && !f.required;
   switch (f.type) {
     case FieldType.dateTime:
-      return isOpt
-          ? '$access?.toIso8601String()'
-          : '$access.toIso8601String()';
+      return isOpt ? '$access?.toIso8601String()' : '$access.toIso8601String()';
     case FieldType.enum_:
       // Shared enum (enumRef set) goes through generated `toJson()`
       // extension method — handles wireFormat conversion (dartName /
@@ -449,6 +517,117 @@ String _toJsonExpr(String access, FieldSpec f) {
       return access;
     default:
       return access;
+  }
+}
+
+/// Like `_toJsonExpr` but keeps DateTime as-is (cloud_firestore stores
+/// it as a Timestamp on write) and recurses into nested toFirestore.
+String _toFirestoreExpr(String access, FieldSpec f) {
+  final isOpt = f.optional && !f.required;
+  switch (f.type) {
+    case FieldType.dateTime:
+      // Pass DateTime through unchanged — cloud_firestore writes it as
+      // a Timestamp. Avoids the lossy ISO-string roundtrip that broke
+      // range queries and `serverDefault: now`.
+      return access;
+    case FieldType.enum_:
+      if (f.enumRef != null) {
+        return isOpt ? '$access?.toJson()' : '$access.toJson()';
+      }
+      return isOpt ? '$access?.name' : '$access.name';
+    case FieldType.nestedType:
+      return isOpt ? '$access?.toFirestore()' : '$access.toFirestore()';
+    case FieldType.list:
+      final inner = f.itemSpec;
+      if (inner?.nestedTypeRef != null) {
+        return isOpt
+            ? '$access?.map((e) => e.toFirestore()).toList()'
+            : '$access.map((e) => e.toFirestore()).toList()';
+      }
+      return access;
+    default:
+      return access;
+  }
+}
+
+/// Like `_fromJsonExpr` but reads DateTime via the duck-typed helper
+/// `_toDateTime` so Firestore Timestamps work without importing
+/// cloud_firestore from the model file.
+String _fromFirestoreExpr(String expr, FieldSpec f, String className) {
+  final isOpt = f.optional && !f.required && !f.primaryKey;
+  final defaultLiteral = f.defaultValue != null
+      ? _dartLiteral(f.defaultValue, f, className)
+      : null;
+
+  String coreFor(String src) {
+    switch (f.type) {
+      case FieldType.dateTime:
+        return isOpt ? '_toDateTimeOrNull($src)' : '_toDateTime($src)';
+      case FieldType.list:
+        final inner = f.itemSpec;
+        if (inner?.nestedTypeRef != null) {
+          final nested = inner!.nestedTypeRef!;
+          return isOpt
+              ? '($src as List?)?.map((e) => $nested.fromFirestore((e as Map).cast<String, dynamic>())).toList()'
+              : '($src as List).map((e) => $nested.fromFirestore((e as Map).cast<String, dynamic>())).toList()';
+        }
+        if (inner != null &&
+            (inner.type == FieldType.string || inner.type == FieldType.ref)) {
+          return isOpt
+              ? '($src as List?)?.cast<String>()'
+              : '($src as List).cast<String>()';
+        }
+        return isOpt
+            ? '($src as List?)?.cast<dynamic>()'
+            : '($src as List).cast<dynamic>()';
+      case FieldType.nestedType:
+        final nested = f.nestedTypeRef!;
+        return isOpt
+            ? '$src == null ? null : $nested.fromFirestore(($src as Map).cast<String, dynamic>())'
+            : '$nested.fromFirestore(($src as Map).cast<String, dynamic>())';
+      // Everything else uses the same shape as fromJson — strings,
+      // ints, bools, refs, maps, enums.
+      default:
+        return _fromJsonCoreFor(src, f, className, isOpt);
+    }
+  }
+
+  if (defaultLiteral != null) {
+    final readExpr = coreFor(expr);
+    return '$expr == null ? $defaultLiteral : $readExpr';
+  }
+  return coreFor(expr);
+}
+
+/// Extracted body of `_fromJsonExpr.coreFor` for primitive / enum / map
+/// branches that fromFirestore can reuse 1:1.
+String _fromJsonCoreFor(String src, FieldSpec f, String className, bool isOpt) {
+  switch (f.type) {
+    case FieldType.string:
+    case FieldType.ref:
+      return '$src as String${isOpt ? '?' : ''}';
+    case FieldType.int_:
+      return '($src as num${isOpt ? '?' : ''})${isOpt ? '?' : ''}.toInt()';
+    case FieldType.double_:
+      return '($src as num${isOpt ? '?' : ''})${isOpt ? '?' : ''}.toDouble()';
+    case FieldType.bool_:
+      return '$src as bool${isOpt ? '?' : ''}';
+    case FieldType.enum_:
+      final enumName = f.enumRef ?? _enumNameFor(className, f.name);
+      if (f.enumRef != null) {
+        return isOpt
+            ? '$src == null ? null : ${enumName}Json.fromJson($src as String)'
+            : '${enumName}Json.fromJson($src as String)';
+      }
+      return isOpt
+          ? '$src == null ? null : $enumName.values.byName($src as String)'
+          : '$enumName.values.byName($src as String)';
+    case FieldType.map:
+      return isOpt
+          ? '($src as Map?)?.cast<String, dynamic>()'
+          : '($src as Map).cast<String, dynamic>()';
+    default:
+      throw StateError('_fromJsonCoreFor: unhandled ${f.type}');
   }
 }
 
@@ -560,6 +739,7 @@ String _fileNameFor(String collectionName) {
     (m) => '_${m.group(0)!.toLowerCase()}',
   );
   // strip trailing 's' for singular naming convention
-  final singular = snake.endsWith('s') ? snake.substring(0, snake.length - 1) : snake;
+  final singular =
+      snake.endsWith('s') ? snake.substring(0, snake.length - 1) : snake;
   return '$singular.dart';
 }

@@ -95,13 +95,16 @@ String _emitMatchBlock(CollectionSpec c) {
 
   final r = c.rules!;
   if (r.read != null) {
-    buf.writeln('      allow read: if ${_expandExpr(r.read!, c, ctx: _ExprCtx.read, idVar: idVar)};');
+    buf.writeln(
+        '      allow read: if ${_expandExpr(r.read!, c, ctx: _ExprCtx.read, idVar: idVar)};');
   }
   if (r.create != null) {
-    buf.writeln('      allow create: if ${_expandExpr(r.create!, c, ctx: _ExprCtx.create, idVar: idVar)};');
+    buf.writeln(
+        '      allow create: if ${_expandExpr(r.create!, c, ctx: _ExprCtx.create, idVar: idVar)};');
   }
   for (final clause in r.update) {
-    buf.writeln('      allow update: if ${_expandUpdateClause(clause, c, idVar: idVar)};');
+    buf.writeln(
+        '      allow update: if ${_expandUpdateClause(clause, c, idVar: idVar)};');
   }
   if (r.delete != null) {
     final v = r.delete!.toLowerCase();
@@ -110,7 +113,8 @@ String _emitMatchBlock(CollectionSpec c) {
     } else if (v == 'true') {
       buf.writeln('      allow delete: if true;');
     } else {
-      buf.writeln('      allow delete: if ${_expandExpr(r.delete!, c, ctx: _ExprCtx.delete, idVar: idVar)};');
+      buf.writeln(
+          '      allow delete: if ${_expandExpr(r.delete!, c, ctx: _ExprCtx.delete, idVar: idVar)};');
     }
   }
 
@@ -138,9 +142,8 @@ String _idVarFor(CollectionSpec c) {
   // Common Dart-style camelCase: stripping a trailing 's' is a passable
   // heuristic for 80% of cases (users → userId, workBriefs → workBriefId,
   // teams → teamId). Edge cases (auditLogs → auditLogId) work fine too.
-  final base = c.name.endsWith('s')
-      ? c.name.substring(0, c.name.length - 1)
-      : c.name;
+  final base =
+      c.name.endsWith('s') ? c.name.substring(0, c.name.length - 1) : c.name;
   return '${base}Id';
 }
 
@@ -162,17 +165,18 @@ String _expandExpr(
   final tenant = c.tenant;
   // For mutations (create/update/delete) the new doc lives in
   // `request.resource.data`; for reads it's `resource.data`.
-  final tenantField =
-      ctx == _ExprCtx.create
-          ? 'request.resource.data.$tenant'
-          : 'resource.data.$tenant';
+  final tenantField = ctx == _ExprCtx.create
+      ? 'request.resource.data.$tenant'
+      : 'resource.data.$tenant';
 
   var s = src;
   // Replacements ordered longest-first so multi-token combos win over
   // single-tokens (e.g. `tenantMatchOrAdmin` before `tenant`).
   s = s.replaceAll(
     'tenantMatchOrAdmin',
-    tenant != null ? '($tenantField == getUserOrgId() || isAdmin())' : 'isAdmin()',
+    tenant != null
+        ? '($tenantField == getUserOrgId() || isAdmin())'
+        : 'isAdmin()',
   );
   s = s.replaceAll(
     'tenantSelf',
@@ -197,7 +201,8 @@ String _expandUpdateClause(
   CollectionSpec c, {
   required String idVar,
 }) {
-  final role = _expandExpr(clause.roleExpr, c, ctx: _ExprCtx.update, idVar: idVar);
+  final role =
+      _expandExpr(clause.roleExpr, c, ctx: _ExprCtx.update, idVar: idVar);
   final fields = clause.fieldsExpr.trim();
 
   if (fields == 'all' || fields.isEmpty) {

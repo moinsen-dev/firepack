@@ -30,29 +30,50 @@ class User {
     String? displayName,
     String? email,
     UserRole? role,
-  }) => User(
-    id: id ?? this.id,
-    organizationId: organizationId ?? this.organizationId,
-    displayName: displayName ?? this.displayName,
-    email: email ?? this.email,
-    role: role ?? this.role,
-  );
+  }) =>
+      User(
+        id: id ?? this.id,
+        organizationId: organizationId ?? this.organizationId,
+        displayName: displayName ?? this.displayName,
+        email: email ?? this.email,
+        role: role ?? this.role,
+      );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'organizationId': organizationId,
-    'displayName': displayName,
-    'email': email,
-    'role': role.toJson(),
-  };
+        'id': id,
+        'organizationId': organizationId,
+        'displayName': displayName,
+        'email': email,
+        'role': role.toJson(),
+      };
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json['id'] as String,
-    organizationId: json['organizationId'] as String,
-    displayName: json['displayName'] as String,
-    email: json['email'] as String,
-    role: json['role'] == null ? UserRole.reader : UserRoleJson.fromJson(json['role'] as String),
-  );
+        id: json['id'] as String,
+        organizationId: json['organizationId'] as String,
+        displayName: json['displayName'] as String,
+        email: json['email'] as String,
+        role: json['role'] == null
+            ? UserRole.reader
+            : UserRoleJson.fromJson(json['role'] as String),
+      );
+
+  Map<String, dynamic> toFirestore() => {
+        'id': id,
+        'organizationId': organizationId,
+        'displayName': displayName,
+        'email': email,
+        'role': role.toJson(),
+      };
+
+  factory User.fromFirestore(Map<String, dynamic> data) => User(
+        id: data['id'] as String,
+        organizationId: data['organizationId'] as String,
+        displayName: data['displayName'] as String,
+        email: data['email'] as String,
+        role: data['role'] == null
+            ? UserRole.reader
+            : UserRoleJson.fromJson(data['role'] as String),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -66,11 +87,5 @@ class User {
           role == other.role;
 
   @override
-  int get hashCode => Object.hash(
-        id,
-        organizationId,
-        displayName,
-        email,
-        role
-      );
+  int get hashCode => Object.hash(id, organizationId, displayName, email, role);
 }

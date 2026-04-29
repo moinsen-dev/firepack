@@ -54,10 +54,14 @@ collections:
       create: "signedIn && tenantSelf"
 ''');
       final out = generateRulesFile(spec);
-      expect(out,
-          contains('allow read: if isSignedIn() && resource.data.organizationId == getUserOrgId();'));
-      expect(out,
-          contains('allow create: if isSignedIn() && request.resource.data.organizationId == getUserOrgId();'));
+      expect(
+          out,
+          contains(
+              'allow read: if isSignedIn() && resource.data.organizationId == getUserOrgId();'));
+      expect(
+          out,
+          contains(
+              'allow create: if isSignedIn() && request.resource.data.organizationId == getUserOrgId();'));
     });
 
     test('expands update field-allowlist', () {

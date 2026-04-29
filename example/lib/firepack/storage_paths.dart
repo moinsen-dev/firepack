@@ -20,10 +20,14 @@ class StoragePaths {
   static String postCovers({
     required String organizationId,
     required String postId,
-  }) => 'covers/$organizationId/$postId.jpg';
+  }) =>
+      'covers/$organizationId/$postId.jpg';
 
   /// MIME types accepted by the `postCovers` bucket.
-  static const List<String> postCoversContentTypes = ['image/jpeg', 'image/png'];
+  static const List<String> postCoversContentTypes = [
+    'image/jpeg',
+    'image/png'
+  ];
 
   /// Path for `attachments` bucket. Template:
   /// `attachments/{organizationId}/{postId}/{attachmentId}`
@@ -32,8 +36,13 @@ class StoragePaths {
     required String organizationId,
     required String postId,
     required String attachmentId,
-  }) => 'attachments/$organizationId/$postId/$attachmentId';
+  }) =>
+      'attachments/$organizationId/$postId/$attachmentId';
 
   /// MIME types accepted by the `attachments` bucket.
-  static const List<String> attachmentsContentTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+  static const List<String> attachmentsContentTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/png'
+  ];
 }

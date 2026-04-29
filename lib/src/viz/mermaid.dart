@@ -13,7 +13,8 @@ String renderMermaid(Spec spec) {
   b.writeln('erDiagram');
 
   for (final c in spec.collections.values) {
-    b.writeln('  %% ${c.name}${c.tenant != null ? ' [tenant=${c.tenant}]' : ''}');
+    b.writeln(
+        '  %% ${c.name}${c.tenant != null ? ' [tenant=${c.tenant}]' : ''}');
     b.writeln('  ${c.name} {');
     for (final f in c.fields.values) {
       final type = _mermaidType(f);
@@ -33,11 +34,13 @@ String renderMermaid(Spec spec) {
   // Storage-buckets — rendered as their own nodes so the cross-system
   // edge from a Firestore field to a Storage path is visible.
   for (final s in spec.storage.values) {
-    b.writeln('  %% storage:${s.name}${s.tenant != null ? ' [tenant=${s.tenant}]' : ''}');
+    b.writeln(
+        '  %% storage:${s.name}${s.tenant != null ? ' [tenant=${s.tenant}]' : ''}');
     b.writeln('  ${s.name} {');
     b.writeln('    string path "${_escape(s.path)}"');
     if (s.contentTypes.isNotEmpty) {
-      b.writeln('    string contentTypes "${_escape(s.contentTypes.join(","))}"');
+      b.writeln(
+          '    string contentTypes "${_escape(s.contentTypes.join(","))}"');
     }
     b.writeln('  }');
   }
@@ -117,8 +120,7 @@ String renderMermaid(Spec spec) {
   return b.toString();
 }
 
-String _escape(String s) =>
-    s.replaceAll('"', "'").replaceAll('\n', ' ');
+String _escape(String s) => s.replaceAll('"', "'").replaceAll('\n', ' ');
 
 String _mermaidType(FieldSpec f) {
   switch (f.type) {

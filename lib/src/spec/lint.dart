@@ -108,8 +108,7 @@ List<LintIssue> lint(Spec spec) {
           f.refTarget != null) {
         final target = f.refTarget!;
         final dot = target.indexOf('.');
-        final collection =
-            dot >= 0 ? target.substring(0, dot) : target;
+        final collection = dot >= 0 ? target.substring(0, dot) : target;
         if (!knownCollections.contains(collection)) {
           issues.add(LintIssue(
             LintKind.orphanRef,
@@ -118,8 +117,7 @@ List<LintIssue> lint(Spec spec) {
           ));
         }
       }
-      if (f.storageBucket != null &&
-          !knownBuckets.contains(f.storageBucket)) {
+      if (f.storageBucket != null && !knownBuckets.contains(f.storageBucket)) {
         issues.add(LintIssue(
           LintKind.orphanStorageRef,
           '${c.name}.${f.name}',
@@ -141,9 +139,8 @@ List<LintIssue> lint(Spec spec) {
     // Duplicate index detection
     final seen = <String>{};
     for (final i in c.indexes) {
-      final sig = i.fields
-          .map((f) => '${f.name}:${f.direction.name}')
-          .join(',');
+      final sig =
+          i.fields.map((f) => '${f.name}:${f.direction.name}').join(',');
       if (!seen.add(sig)) {
         issues.add(LintIssue(
           LintKind.duplicateIndex,

@@ -98,15 +98,40 @@ just recipe exists — it makes the workflow drift.
   touching any generator. **Riverpod-only today**; Bloc support is a
   roadmap item, not a current feature.
 
+## Firestore vs. JSON method-pair convention (since v0.0.14)
+
+Models emit **two** independent (de)serialisation method pairs:
+
+- `toJson()` / `fromJson()` — pure JSON, DateTime ↔ ISO-string. Use
+  for REST APIs, hashing, plain-text logging, snapshot tests.
+- `toFirestore()` / `fromFirestore()` — Firestore-native, DateTime
+  stays DateTime. cloud_firestore plugin handles the Timestamp wrap
+  on writes; reads come back as Timestamps and the duck-typed
+  `_toDateTime` helper converts them. Use this for any Firestore IO.
+
+Generated repositories always use the Firestore variant. Don't mix:
+calling `repo._firestore.collection(...).set(post.toJson())` directly
+will store ISO strings instead of Timestamps and silently break range
+queries.
+
+## `serverDefault: now` — server clock wins
+
+Fields with `serverDefault: now` in the spec are overwritten by the
+generated `add()` with `FieldValue.serverTimestamp()`. Client-set
+values are ignored by design. Don't try to "preserve" a client
+DateTime by calling `add()` for the field — use `updateById()` after
+the create instead, or drop `serverDefault` from the field.
+
 ## Open code-review findings (carry forward)
 
-- **`firestore_paths.dart` codegen is missing.** README + repo
-  generator both reference `paths.dart` as if it were generated, but
-  no generator exists in `lib/src/codegen/`. The example app
-  hand-writes the file as a stub. Real fix: add a
-  `firestore_paths_generator.dart` mirroring the storage one, plus a
-  `firepack regen --target paths` flow.
-- **No Flutter smoke-test before this commit.** Codegens were only
-  exercised via string-equality fixtures, so a generator could emit
-  Dart that string-matched the fixture but didn't compile in a real
-  Flutter app. The example app closes that loop; keep it green.
+- **`add()` is overwrite-set, not merge.** Calling `add()` with an
+  existing id silently nukes server-only fields the model doesn't
+  carry. Real fix: emit a separate `set(post, {SetOptions})`-aware
+  method, or rename `add` to make the overwrite semantics obvious.
+  Documented but not yet codegen-encoded.
+- **`PostRepository(FirebaseFirestore.instance)` is hardcoded in the
+  generated provider.** DI is only possible via Riverpod
+  `overrideWithValue`. Acceptable today but worth exposing more
+  obviously when more consumers land.
+- **Transactions / batch writes are not generated.** Real-world
+  Firestore apps need them. Roadmap.

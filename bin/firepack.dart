@@ -176,8 +176,7 @@ class _WatchCommand extends Command<int> {
     final watcher = FileWatcher(specFile.absolute.path);
     stdout.writeln('firepack watch: watching $specPath  (Ctrl-C to exit)');
     await for (final event in watcher.events) {
-      if (event.type == ChangeType.MODIFY ||
-          event.type == ChangeType.ADD) {
+      if (event.type == ChangeType.MODIFY || event.type == ChangeType.ADD) {
         stdout.writeln(
           '\nfirepack watch: spec changed at ${DateTime.now().toIso8601String()}',
         );
@@ -211,7 +210,8 @@ class _WatchCommand extends Command<int> {
             if (!dir.existsSync()) dir.createSync(recursive: true);
             final files = generateAllDartModels(spec, sourceFile: specPath);
             files.forEach((f, c) {
-              if (t.collection != null && !_matchesCollection(f, t.collection!)) {
+              if (t.collection != null &&
+                  !_matchesCollection(f, t.collection!)) {
                 return;
               }
               File('${t.out}/$f').writeAsStringSync(c);
@@ -222,7 +222,8 @@ class _WatchCommand extends Command<int> {
             if (!dir.existsSync()) dir.createSync(recursive: true);
             final files = generateAllRepositories(spec, sourceFile: specPath);
             files.forEach((f, c) {
-              if (t.collection != null && !_matchesCollection(f, t.collection!)) {
+              if (t.collection != null &&
+                  !_matchesCollection(f, t.collection!)) {
                 return;
               }
               File('${t.out}/$f').writeAsStringSync(c);
@@ -244,6 +245,14 @@ class _WatchCommand extends Command<int> {
               File(t.out).writeAsStringSync(body);
               stdout.writeln('  ✓ storage → ${t.out}');
             }
+          case 'paths':
+            final body = generateFirestorePathsFile(spec, sourceFile: specPath);
+            if (body == null) {
+              stdout.writeln('  - paths skipped (no collections in spec)');
+            } else {
+              File(t.out).writeAsStringSync(body);
+              stdout.writeln('  ✓ paths → ${t.out}');
+            }
           default:
             stderr.writeln('  ✗ unknown target "${t.target}" — skipped');
         }
@@ -254,9 +263,8 @@ class _WatchCommand extends Command<int> {
   }
 
   bool _matchesCollection(String fileName, String collection) {
-    final stem = fileName
-        .replaceAll('_repository.dart', '')
-        .replaceAll('.dart', '');
+    final stem =
+        fileName.replaceAll('_repository.dart', '').replaceAll('.dart', '');
     return collection.toLowerCase().startsWith(stem.replaceAll('_', ''));
   }
 
@@ -297,6 +305,8 @@ class _WatchCommand extends Command<int> {
         return 'lib/firepack/repositories';
       case 'storage':
         return 'lib/firepack/storage_paths.dart';
+      case 'paths':
+        return 'lib/firepack/paths.dart';
       default:
         return target;
     }
@@ -377,16 +387,23 @@ class _DiffCommand extends Command<int> {
 }
 
 class _RegenCommand extends _SpecCommand {
-  static const _supportedTargets = {'indexes', 'rules', 'models', 'repos', 'storage'};
+  static const _supportedTargets = {
+    'indexes',
+    'rules',
+    'models',
+    'repos',
+    'storage',
+    'paths'
+  };
 
   _RegenCommand() {
     argParser
       ..addOption(
         'target',
         abbr: 't',
-        help: 'What to regenerate. Today: indexes, rules, models. '
-            'Future: repos, types.',
-        allowed: ['indexes', 'rules', 'models', 'repos', 'storage'],
+        help: 'What to regenerate. Today: indexes, rules, models, '
+            'repos, storage, paths.',
+        allowed: ['indexes', 'rules', 'models', 'repos', 'storage', 'paths'],
         defaultsTo: 'indexes',
       )
       ..addOption(
@@ -408,8 +425,7 @@ class _RegenCommand extends _SpecCommand {
   String get name => 'regen';
 
   @override
-  String get description =>
-      'Regenerates an artifact from the spec '
+  String get description => 'Regenerates an artifact from the spec '
       '(indexes today, more targets coming via firepack ROADMAP).';
 
   @override
@@ -479,6 +495,15 @@ class _RegenCommand extends _SpecCommand {
         }
         content = body;
         defaultOut = 'lib/firepack/storage_paths.dart';
+      case 'paths':
+        final body = generateFirestorePathsFile(spec);
+        if (body == null) {
+          stdout.writeln('firepack regen paths: '
+              'spec has no collections — nothing to generate.');
+          return 0;
+        }
+        content = body;
+        defaultOut = 'lib/firepack/paths.dart';
       default:
         return 64;
     }

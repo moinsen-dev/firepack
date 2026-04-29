@@ -29,5 +29,8 @@ targets:
   storage:
     out: lib/firepack/storage_paths.dart
 
+  paths:
+    out: lib/firepack/paths.dart
+
   viz:
     out: DATA_MODEL.md

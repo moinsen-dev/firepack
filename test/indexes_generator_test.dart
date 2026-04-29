@@ -53,8 +53,8 @@ collections:
       final yaml = File('example/firepack.yaml').readAsStringSync();
       final spec = FirepackParser().parse(yaml);
       final generated = generateIndexesJson(spec);
-      final fixture = File('test/fixtures/blog.indexes.expected.json')
-          .readAsStringSync();
+      final fixture =
+          File('test/fixtures/blog.indexes.expected.json').readAsStringSync();
 
       final genTuples = _extractTuples(generated);
       final fixTuples = _extractTuples(fixture);
@@ -87,7 +87,8 @@ List<String> _extractTuples(String json) {
       r'"fieldPath":\s*"(?<name>[^"]+)",\s*"order":\s*"(?<order>ASCENDING|DESCENDING)"',
     )
         .allMatches(fieldsBlob)
-        .map((fm) => '${fm.namedGroup('name')}:${fm.namedGroup('order')!.toLowerCase()}')
+        .map((fm) =>
+            '${fm.namedGroup('name')}:${fm.namedGroup('order')!.toLowerCase()}')
         .join(',');
     tuples.add('$col::$fields');
   }
