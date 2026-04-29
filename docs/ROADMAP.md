@@ -6,6 +6,63 @@ nach Architektur-Eleganz. Siehe [PHILOSOPHY.md](./PHILOSOPHY.md).
 
 ## Done
 
+### v0.0.13 — Generator hygiene fix (2026-04-29, ~5 min)
+
+- `repository_generator.dart`: tenant_query.dart import nur wenn echt
+  benutzt. Unused-import-Warnings auf evidence/workBriefRevisions
+  beseitigt während der WorkBrief Phase-2-Wrapper-Migration.
+
+### v0.0.12 — Per-Collection className override (2026-04-29, ~10 min)
+
+- Spec: `className: <DartClass>` pro Collection. Filename folgt der
+  Konvention. Konsumenten mit eigenem Naming (AuditLogEntry,
+  AppNotification, WorkBriefIssue) bleiben damit konsistent.
+- Re-Exports aus generated Files reverted — caused ambiguous_import
+  collisions during partial migrations.
+
+### v0.0.11 — M8.5 enum wireFormat (2026-04-29, ~10 min)
+
+- Per-enum `wireFormat: snake_case | dartName` für JSON-Serialization.
+- Generated `<Name>Json`-Extension mit explizitem `toJson` /
+  static `fromJson(s)`.
+- Unblockt WorkBrief-Migration (Production-Firestore-Docs nutzen
+  snake_case-Werte via `@JsonValue`).
+
+### v0.0.10 — M8 Dart-Model-Vollausbau + M9 Storage-Codegen (2026-04-29, ~45 min)
+
+- M8.1 `copyWith` (38 call-sites in WorkBrief unblockt)
+- M8.2 `operator ==` + `hashCode` (Riverpod-rebuild-Optimization)
+- M8.3 Nested types (`types:`-Block + `type[<Name>]`-Fields, Multi-File)
+- M8.4 Shared enums (`enums:`-Block + `enum[<Name>]`-Fields, gesammelt
+  in `enums.dart`)
+- M9 Storage-Path-Codegen — typisierte
+  `StoragePaths.<bucketName>(...)` Helpers pro deklariertem Bucket.
+
+**Status nach v0.0.10-v0.0.13:** firepack ist feature-complete für
+WorkBrief. Alle ursprünglichen Milestones (M1-M9) durch + drei
+Reife-Patches. Roadmap leer — neue Items nur wenn ein Konsument
+echten Schmerz hat (zweimaliger Auftritt in zwei Wochen).
+
+#### Reflexion-Sammlung (Bootstrap-Datenpunkte)
+
+| Iteration | Schätzung | Realität | Faktor |
+|---|---|---|---|
+| M1 indexes | 50 min | 18 min | ~3× |
+| M2 rules generator | 3-4h | 45 min | ~5× |
+| M2.5 WorkBrief rules migration | 1-1.5h | 35 min | ~2-3× |
+| M3 dart models | 5h | 45 min | ~6-7× |
+| M4 repos | 3h | 45 min | ~4× |
+| M5 diff | 1.5h | 35 min | ~3× |
+| M6 watch | 30 min | 14 min | ~2× |
+| M7 storage in spec + viz | 30 min | 14 min | ~2× |
+| M8.1-M8.4 + M9 (bundle) | 100 min | 45 min | ~2× |
+| M8.5 wireFormat | 20 min | 10 min | ~2× |
+| className override | 30 min | 10 min | ~3× |
+
+**Konsistente ~2-3× Unterschätzung.** Foundation re-use ist der
+Multiplier — jeder neue Generator nimmt das Spec-Modell + Parser
+quasi gratis.
+
 ### v0.0.9 — M7 Storage in Spec + Viz (2026-04-29, ~34 min)
 
 - Spec-Erweiterung: `storage:`-Block + `storageRef[<bucket>]`-Field-

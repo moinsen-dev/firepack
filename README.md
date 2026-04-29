@@ -109,31 +109,52 @@ enough day-to-day.
 
 ## Status
 
-**Today (v0.0.9):**
+**Today (v0.0.13):**
 - ✅ YAML spec parser + lint
 - ✅ Mermaid `firepack viz` output (`.md` auto-wraps in code fence)
 - ✅ Indexes generator (`firestore.indexes.json`, deterministic)
 - ✅ Rules generator (`firestore.rules`, with verbatim escape hatch)
-- ✅ Dart model codegen (immutable class + toJson/fromJson + enums)
+- ✅ Dart model codegen — immutable class with `copyWith`,
+  `operator ==` / `hashCode`, `toJson`/`fromJson`, nested types,
+  shared enums with snake_case wireFormat
 - ✅ Repository + Riverpod provider codegen (typed queries from spec)
+- ✅ Per-Collection `className:` override
 - ✅ `firepack diff` (PR-comment-shape semantic diff)
 - ✅ `firepack watch` (auto-regen on save, multi-target via config)
-- ✅ Storage refs in spec (`storage:` block + `storageRef[X]` fields)
+- ✅ Storage refs + typed `StoragePaths.<bucket>()` helpers
 - ☐ TypeScript-types generator
 - ☐ Pub.dev release
+- ☐ CI for firepack itself
 
 **WorkBrief consumption today:**
 - ✅ `firestore.indexes.json` — generated since v0.0.2
 - ✅ `firestore.rules` — generated since v0.0.4
-- ✅ `lib/firepack/models/error_report.dart` — generated since v0.0.5
-- ✅ `lib/firepack/repositories/error_report_repository.dart` —
-  generated since v0.0.6, drives the /admin/errors dashboard
+- ✅ `lib/firepack/models/*.dart` — **12 of 13 collections** generated
+  (all except `trustCharterAcknowledgements` which is a nested map
+  on org/user docs, not its own collection)
+- ✅ `lib/firepack/repositories/*.dart` — generated repos for 8
+  collections; hand-repos that have mutation logic wrap them
+  (Watch-Methoden generated, Mutations bleiben hand)
+- ✅ `lib/firepack/storage_paths.dart` — typed Storage-Pfade konsumiert
+  von evidence + sourceMaterials Upload-Code (drift-sicher)
+- ✅ `firepack.architecture.md` — Mermaid-Graph der ganzen
+  Datenarchitektur (13 Collections + 3 Nested Types + 2 Storage-
+  Buckets + alle FK / Composition / Storage-Edges)
 
 ## Examples
 
-`example/blog.firepack.yaml` is a small generic spec that exercises
-every feature (collections, indexes, queries, rules, storage refs).
-Use it as a starting point or to sanity-check the toolchain.
+`example/` is a self-contained Flutter + Riverpod app that consumes
+firepack-generated code. It contains:
+
+- `example/firepack.yaml` — generic mini-spec exercising every feature
+  (collections, indexes, queries, rules, storage refs).
+- `example/lib/firepack/**` — generated models, repositories,
+  storage paths (committed so `flutter analyze` works on a fresh clone).
+- `example/lib/main.dart` — minimal UI consuming the generated
+  Riverpod providers.
+
+`flutter analyze` on this app is wired into `just check`, so a
+generator change that emits broken Dart fails the build immediately.
 
 The real-world driver is **WorkBrief** — its spec lives in the
 WorkBrief repo at `app/firepack.yaml`, not in this repository.

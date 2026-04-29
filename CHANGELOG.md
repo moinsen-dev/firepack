@@ -11,6 +11,128 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - TypeScript-Types-Generator (functions/src/firepack/types/*.ts) für
   Cloud-Functions-Side-Konsumption.
 - Pub.dev-Release sobald Spec-Format extern stabil bleibt.
+- CI für firepack selbst (GitHub Actions: pub get + analyze + test).
+
+## [0.0.13] — 2026-04-29
+
+### Fixed
+- `repository_generator.dart`: `tenant_query.dart` import wird nur
+  noch emittiert wenn mindestens eine Query den `tenant`-Token im
+  `where:` listet. Vorher: Collections mit `tenant: ...` Feld bekamen
+  den Import auch wenn keine Query `scopedToOrg` benutzte (z.B.
+  byId-only oder by-arbitrary-field). Caused unused_import-Warnings
+  auf evidence- und workBriefRevisions-repos während WorkBrief
+  Phase-2-Wrapper-Migration.
+
+## [0.0.12] — 2026-04-29
+
+### Added
+- **Per-Collection `className:` override.** Generated Dart class +
+  filename override für Konsumenten die andere Naming-Konventionen
+  haben als firepack's default `_classNameFor`. Beispiel:
+  ```yaml
+  auditLogs:
+    className: AuditLogEntry  # statt AuditLog
+  ```
+  Generated: `audit_log_entry.dart` mit `class AuditLogEntry`.
+
+### Fixed
+- Re-Exports von nested-type / enums.dart aus generated Model-Files
+  reverted. Während partial migrations (firepack-generated lebt
+  parallel zu hand-written) verursachten transitive Re-Exports
+  ambiguous_import-Errors. Konsumenten importieren jetzt explizit
+  was sie nutzen — kleiner ergonomischer Cost, deutlich weniger
+  Noise.
+
+### Reflexion
+| Phase | Schätzung | Realität |
+|---|---|---|
+| className override + parser/generator + viz/diff | 30 min | ~10 min |
+| Re-export revert | — (erst beim Migration-Friction entdeckt) | ~5 min |
+
+## [0.0.11] — 2026-04-29
+
+### Added
+- **M8.5 — Enum wireFormat (snake_case JSON support).** Per-Enum
+  konfigurable Wire-Format für JSON-Serialization:
+  ```yaml
+  enums:
+    WorkBriefStatus:
+      values: [draft, needsReview, completedByWorker]
+      wireFormat: snake_case   # default: dartName
+  ```
+  Generated `enums.dart`:
+  - emittiert die bare Enum
+  - emittiert eine `<Name>Json`-Extension mit `toJson()` und statischer
+    `fromJson(String)` die wireFormat respektiert
+  - snake_case → explizite switch-arms (compile-checked, grep-friendly)
+  - dartName → trivial `name` / `byName` delegation
+
+  Models stoppen direkten `.name` / `byName`-Zugriff für shared enums —
+  rufen stattdessen `value.toJson()` / `EnumName.fromJson(s)`. Inline
+  enums (per-collection) behalten `.name` / `byName` für Terseness.
+
+### Why now
+WorkBrief-Production-Firestore-Docs nutzen snake_case-Enum-Werte
+(`'work_step'`, `'completed_by_worker'`, `'in_review'`) — encoded by
+`@JsonValue` auf jedem Freezed-Enum. firepack-generated Models hätten
+die als missing-name gelesen und geworfen. M8.5 unblockt die
+WorkBrief-Phase-2-atomare-Migration.
+
+### Reflexion
+| Phase | Schätzung | Realität |
+|---|---|---|
+| Enum wireFormat extension + tests | 20 min | ~10 min |
+
+## [0.0.10] — 2026-04-29
+
+### Added — M8 Dart-Model-Generator Vollausbau
+- **M8.1 `copyWith`** für jedes generated Model. Simple-Pattern (named
+  optional, fallback auf this.x). 38 call-sites in WorkBrief unblockt.
+- **M8.2 `operator ==` + `hashCode`** (value equality). Lists + Maps
+  via private `_listEq` / `_mapEq` Helpers (no external deps); Helpers
+  emittiert nur wenn benutzt. Riverpod StreamProvider-Rebuild-
+  Optimization funktioniert korrekt.
+- **M8.3 Nested types** — top-level `types:` Block in spec, Fields
+  referenzieren via `type[<Name>]` oder `list[type[<Name>]]`. Each
+  nested type → eigenes generated File mit voller Shape (copyWith,
+  ==, hashCode, toJson, fromJson). Composition-Imports automatisch
+  emittiert. Cross-File-Type-Safety bleibt erhalten
+  (List<WorkBriefTask>, nicht List<dynamic>).
+- **M8.4 Shared enums** — top-level `enums:` Block, Fields referenzieren
+  via `enum[<Name>]`. Alle shared enums in einem `enums.dart` File
+  gesammelt. Models importieren bei Bedarf. Löst das "TaskType used
+  by both DraftTask and WorkBriefTask"-Problem clean.
+
+### Added — M9 Storage-Path-Codegen
+- **`firepack regen --target storage`** (und Watch-Target) emittiert
+  `lib/firepack/storage_paths.dart` mit einer typisierten
+  `static String <bucketName>({...})` pro Bucket plus
+  `<bucketName>ContentTypes` const-Liste. Hand-getippte Storage-
+  Pfad-Drift wird unmöglich.
+
+### Lint
+- `orphanNestedTypeRef`, `orphanEnumRef`
+- `nameCollision` enforces uniqueness across collections / buckets / types
+
+### Bundled example
+- `example/firepack.yaml` (umbenannt von `blog.firepack.yaml`)
+  demonstriert alle Features in einem Spec — Collections, indexes,
+  queries, rules, storage, shared enums, nested types.
+
+### Reflexion (M8 + M9)
+| Phase | Schätzung | Realität |
+|---|---|---|
+| M8.1 copyWith | 20 min | ~5 min |
+| M8.2 == / hashCode | 10 min | ~5 min |
+| M8.3 nested types | 30 min | ~15 min |
+| M8.4 shared enums | 15 min | ~10 min |
+| M9 storage paths | 25 min | ~10 min |
+| **Gesamt M8+M9** | **~100 min** | **~45 min** |
+
+Lessons: Foundation-Re-Use ist der echte Multiplier. Spec-Modell +
+Parser + Codegen-Pattern sind ab M3 auf einem Niveau bei dem jeder
+neue Generator <30 min real braucht.
 
 ## [0.0.9] — 2026-04-29
 
