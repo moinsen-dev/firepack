@@ -44,25 +44,16 @@ String _emitFile(
   buf.writeln(_header(sourceFile));
 
   // Imports — pull in any nested-type files this class references.
-  // Also re-export them so a consumer that imports this model file
-  // automatically sees the related enum / nested-type names without
-  // needing to know which file each lives in.
+  // We deliberately do NOT re-export them: during partial migrations
+  // (firepack-generated alongside hand-written models), transitive
+  // re-exports collide with the parallel hand-written enums. Consumers
+  // import what they use directly — small ergonomic cost, big drop in
+  // ambiguity-error noise.
   final imports = _collectImports(fields);
   if (imports.isNotEmpty) {
     buf.writeln();
-    // Suppress unnecessary_import: nested-type files re-export
-    // enums.dart, so direct enums.dart imports look redundant — they
-    // are not (the outer class uses the enums directly).
-    if (imports.length > 1) {
-      buf.writeln('// ignore_for_file: unnecessary_import');
-      buf.writeln();
-    }
     for (final imp in imports) {
       buf.writeln("import '$imp';");
-    }
-    buf.writeln();
-    for (final imp in imports) {
-      buf.writeln("export '$imp';");
     }
   }
   buf.writeln();
@@ -410,6 +401,16 @@ String _dartLiteral(dynamic value, FieldSpec f, String className) {
     if (value.isEmpty) return 'const []';
     final items = value.map((v) => _dartLiteral(v, f, className)).join(', ');
     return 'const [$items]';
+  }
+  // Map default — only `{}` (empty map) is supported as a literal today.
+  // Non-empty defaults would need recursive serialisation; defer until
+  // a real spec asks for it.
+  if (value is Map) {
+    if (value.isEmpty) return 'const <String, dynamic>{}';
+    throw StateError(
+      'firepack: non-empty map defaults are not yet supported '
+      '(field "${f.name}" has default $value)',
+    );
   }
   if (f.type == FieldType.enum_) {
     final enumName = f.enumRef ?? _enumNameFor(className, f.name);
