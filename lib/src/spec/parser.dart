@@ -86,9 +86,20 @@ class FirepackParser {
         'firepack: enum "$name" needs non-empty values:',
       );
     }
+    final wf = node['wireFormat']?.toString();
+    final wireFormat = switch (wf) {
+      null => EnumWireFormat.dartName,
+      'dartName' => EnumWireFormat.dartName,
+      'snake_case' => EnumWireFormat.snakeCase,
+      _ => throw FormatException(
+          'firepack: enum "$name" has unsupported wireFormat "$wf" '
+          '(must be "dartName" or "snake_case")',
+        ),
+    };
     return EnumSpec(
       name: name,
       values: v.map((e) => e.toString()).toList(growable: false),
+      wireFormat: wireFormat,
     );
   }
 

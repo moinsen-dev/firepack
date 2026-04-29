@@ -46,8 +46,22 @@ class Spec {
 class EnumSpec {
   final String name;
   final List<String> values;
-  const EnumSpec({required this.name, required this.values});
+
+  /// Wire format for JSON serialization. `null` (default) → use the
+  /// Dart enum identifier verbatim (`workStep` ↔ `"workStep"`).
+  /// `snake_case` → camelCase Dart names mapped to snake_case JSON
+  /// strings (`workStep` ↔ `"work_step"`). Common in projects that
+  /// migrated from json_serializable's `@JsonValue('work_step')`.
+  final EnumWireFormat wireFormat;
+
+  const EnumSpec({
+    required this.name,
+    required this.values,
+    this.wireFormat = EnumWireFormat.dartName,
+  });
 }
+
+enum EnumWireFormat { dartName, snakeCase }
 
 /// A logical Cloud-Storage path template. Not a generator-target by
 /// itself in v1 (rules-generation lives in M7.5 if it gets painful) —

@@ -197,12 +197,56 @@ String? generateSharedEnumsFile(Spec spec, {String? sourceFile}) {
   buf.writeln(_header(sourceFile));
   buf.writeln();
   buf.writeln('// Shared enums — referenced from models via `enum[<Name>]`.');
-  buf.writeln();
+  buf.writeln('// Each enum gets a `<Name>Json` extension with wireFormat-aware');
+  buf.writeln('// toJson()/fromJson() so the model layer never touches naming.');
   for (final e in spec.enums.values) {
+    buf.writeln();
     buf.writeln('enum ${e.name} { ${e.values.join(", ")} }');
     buf.writeln();
+    buf.writeln(_emitEnumJsonExtension(e));
   }
   return buf.toString();
+}
+
+/// Emits a `<EnumName>Json` extension on the enum with `toJson()` and a
+/// static `fromJson(String)` that honours the wireFormat. dartName
+/// extensions are trivial (`name` / `byName`); snake_case extensions
+/// emit explicit switch arms so generated code stays grep-friendly
+/// and compile-checked.
+String _emitEnumJsonExtension(EnumSpec e) {
+  final name = e.name;
+  final buf = StringBuffer();
+  buf.writeln('extension ${name}Json on $name {');
+  if (e.wireFormat == EnumWireFormat.dartName) {
+    buf.writeln('  String toJson() => name;');
+    buf.writeln(
+        '  static $name fromJson(String s) => $name.values.byName(s);');
+  } else {
+    // snake_case
+    buf.writeln('  String toJson() => switch (this) {');
+    for (final v in e.values) {
+      buf.writeln("        $name.$v => '${_camelToSnake(v)}',");
+    }
+    buf.writeln('      };');
+    buf.writeln();
+    buf.writeln('  static $name fromJson(String s) => switch (s) {');
+    for (final v in e.values) {
+      buf.writeln("        '${_camelToSnake(v)}' => $name.$v,");
+    }
+    buf.writeln(
+        "        _ => throw ArgumentError('unknown $name wire value: \$s'),");
+    buf.writeln('      };');
+  }
+  buf.writeln('}');
+  return buf.toString();
+}
+
+String _camelToSnake(String camel) {
+  // workStep → work_step ; checkIn → check_in ; externalAction → external_action
+  return camel.replaceAllMapped(
+    RegExp(r'(?<=.)([A-Z])'),
+    (m) => '_${m.group(0)!.toLowerCase()}',
+  ).toLowerCase();
 }
 
 String _nestedFileName(String typeName) {
@@ -370,6 +414,12 @@ String _toJsonExpr(String access, FieldSpec f) {
           ? '$access?.toIso8601String()'
           : '$access.toIso8601String()';
     case FieldType.enum_:
+      // Shared enum (enumRef set) goes through generated `toJson()`
+      // extension method — handles wireFormat conversion (dartName /
+      // snake_case). Inline enums keep using `.name` for terseness.
+      if (f.enumRef != null) {
+        return isOpt ? '$access?.toJson()' : '$access.toJson()';
+      }
       return isOpt ? '$access?.name' : '$access.name';
     case FieldType.nestedType:
       return isOpt ? '$access?.toJson()' : '$access.toJson()';
@@ -410,6 +460,13 @@ String _fromJsonExpr(String expr, FieldSpec f, String className) {
             : 'DateTime.parse($src as String)';
       case FieldType.enum_:
         final enumName = f.enumRef ?? _enumNameFor(className, f.name);
+        // Shared enum → use generated static `fromJson` (wireFormat-aware).
+        // Inline enum → values.byName as before (dartName only today).
+        if (f.enumRef != null) {
+          return isOpt
+              ? '$src == null ? null : ${enumName}Json.fromJson($src as String)'
+              : '${enumName}Json.fromJson($src as String)';
+        }
         return isOpt
             ? '$src == null ? null : $enumName.values.byName($src as String)'
             : '$enumName.values.byName($src as String)';

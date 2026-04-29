@@ -136,7 +136,50 @@ collections:
       expect(out, isNot(contains('enum ThingStatus')));
       expect(out, contains('final Status status;'));
       expect(out, contains('this.status = Status.draft'));
-      expect(out, contains('Status.values.byName'));
+      // toJson/fromJson go through generated StatusJson extension
+      expect(out, contains('status.toJson()'));
+      expect(out, contains('StatusJson.fromJson'));
+    });
+
+    test('shared enum with wireFormat: snake_case emits switch-arm conversion', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+enums:
+  Status:
+    values: [workStep, qualityCheck, externalAction]
+    wireFormat: snake_case
+collections:
+  things:
+    fields:
+      id: { type: string, primaryKey: true }
+      status: { type: "enum[Status]" }
+''');
+      final enums = generateSharedEnumsFile(spec)!;
+      // snake_case wireFormat: each value mapped explicitly
+      expect(enums, contains('extension StatusJson on Status'));
+      expect(enums, contains("Status.workStep => 'work_step'"));
+      expect(enums, contains("Status.qualityCheck => 'quality_check'"));
+      expect(enums, contains("Status.externalAction => 'external_action'"));
+      expect(enums, contains("'work_step' => Status.workStep"));
+      expect(enums, contains("ArgumentError"));
+    });
+
+    test('shared enum without wireFormat falls back to name/byName', () {
+      final spec = FirepackParser().parse('''
+firepack: 1
+project: t
+enums:
+  Status:
+    values: [a, b, c]
+collections:
+  things:
+    fields:
+      id: { type: string, primaryKey: true }
+''');
+      final enums = generateSharedEnumsFile(spec)!;
+      expect(enums, contains('String toJson() => name;'));
+      expect(enums, contains('Status.values.byName(s)'));
     });
 
     test('generateAllDartModels emits enums.dart when shared enums exist', () {
