@@ -72,17 +72,40 @@ rules, indexes). The fan-out is mechanical and error-prone — exactly
 the shape of work a generator should own. firepack collapses it to one
 diff in `firepack.yaml`.
 
+## Install
+
+Pre-pub-dev release, install from a local clone:
+
+```bash
+git clone https://github.com/moinsen-dev/firepack ~/work/firepack   # or wherever
+dart pub global activate --source path ~/work/firepack
+```
+
+Make sure `~/.pub-cache/bin` is in your PATH:
+
+```bash
+export PATH="$PATH:$HOME/.pub-cache/bin"   # add to ~/.zshrc or ~/.bashrc
+```
+
+Verify:
+
+```bash
+firepack --help
+```
+
+When the firepack source updates, just re-run the activate command —
+path-source activations track the working tree, so `git pull` is
+enough day-to-day.
+
 ## CLI
 
 | Command | Effect |
 |---|---|
-| `firepack init` | scaffolds a starter `firepack.yaml` next to your `pubspec.yaml` |
-| `firepack lint` | validates the spec (orphan refs, missing tenants, …) |
-| `firepack viz` | opens an HTML data-model graph in the default browser |
-| `firepack regen` | one-shot codegen of all targets |
-| `firepack watch` | re-generates on every save (build_runner-style) |
-| `firepack diff` | shows what changed since last regen |
-| `firepack rules:audit` | shells into the firestore-security-rules-auditor agent skill |
+| `firepack lint --spec <path>` | validates the spec (orphan refs, storage refs, missing tenants, …) |
+| `firepack viz --spec <path> [--out file.md]` | renders Mermaid `erDiagram`. `.md` wraps in code-fence for inline GitHub render. |
+| `firepack regen --target <indexes\|rules\|models\|repos> --spec <path>` | one-shot codegen for one target |
+| `firepack watch --spec <path> [--config <path>]` | first-pass regen + watch the spec; re-runs on save. Targets defined in `firepack.config.yaml` next to the spec. |
+| `firepack diff --old <a.yaml> --new <b.yaml>` | semantic diff between two specs (PR-comment shape). |
 
 ## Status
 
